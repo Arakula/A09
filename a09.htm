@@ -4,7 +4,7 @@
 </head>
 <body>
 
-<h1>A09 - 6800/6801/6809/6309 Assembler</h1>
+<h1>A09 - 6800/6801/6809/6301/6309 Assembler</h1>
 
 <p align="right">Copyright (c) 1993,1994 L.C. Benschop<br>
 Parts Copyright (c) 2001-2015 Hermann Seib</p>
@@ -239,7 +239,7 @@ available in A09 (* denotes the default value for a mutually exclusive set):</p>
     <td>both forms accept Motorola 6809 mnemonics</td>
   </tr>
   <tr bgcolor="#f0f0f0">
-    <td valign="top"><b>H63</b></td>
+    <td valign="top"><b>H63|H09</b></td>
     <td>accept Hitachi 6309 mnemonics (still slightly experimental)</td>
   </tr>
   <tr bgcolor="#f0f0f0">
@@ -249,6 +249,10 @@ available in A09 (* denotes the default value for a mutually exclusive set):</p>
   <tr bgcolor="#f0f0f0">
     <td valign="top"><b>M01|M03</b></td>
     <td>accept Motorola 6801 mnemonics</td>
+  </tr>
+  <tr bgcolor="#f0f0f0">
+    <td valign="top"><b>H01|H03</b></td>
+    <td>accept Hitachi 6301 mnemonics (slightly experimental)</td>
   </tr>
   <tr>
     <td colspan="2" height="8" valign="top"></td>
@@ -377,7 +381,7 @@ of these programs). Apart from these, it knows the following directives:</p>
         <td valign="top"><b>&amp;VERSION</b></td>
         <td>contains the A09 version number as a hex constant ($<i>vvss</i>, 
         vv being the main version and ss being the subversion; at the time of writing,
-		the version is <b>$011E</b>).</td>
+		the version is <b>$011F</b>).</td>
       </tr>
       <tr>
         <td valign="top"><b>&amp;PASS</b></td>
