@@ -222,6 +222,7 @@
    v1.29  19/06/15 M01/M02/M03/M08 options added
    v1.30  22/06/15 PHASE/DEPHASE pseudo-ops added
    v1.31  15/07/15 6301/6303 support added
+   v1.32  19/08/15 FCQ/FQB pseudo-ops added
 
 */
 
@@ -237,8 +238,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.31"
-#define VERSNUM      "$011F"            /* can be queried as &VERSION        */
+#define VERSION      "1.32"
+#define VERSNUM      "$0120"            /* can be queried as &VERSION        */
 
 #define UNIX 0                          /* set to != 0 for UNIX specials     */
 
@@ -368,6 +369,7 @@ struct oprecord
 #define PSEUDO_BINARY        44
 #define PSEUDO_PHASE         45
 #define PSEUDO_DEPHASE       46
+#define PSEUDO_FCQ           47
 
 struct oprecord optable09[]=
   {
@@ -558,8 +560,12 @@ struct oprecord optable09[]=
   { "EXTERN",  OPCAT_PSEUDO,      PSEUDO_EXT },
   { "FCB",     OPCAT_PSEUDO,      PSEUDO_FCB },
   { "FCC",     OPCAT_PSEUDO,      PSEUDO_FCC },
+  { "FCQ",     OPCAT_6309 |
+               OPCAT_PSEUDO,      PSEUDO_FCQ },
   { "FCW",     OPCAT_PSEUDO,      PSEUDO_FCW },
   { "FDB",     OPCAT_PSEUDO,      PSEUDO_FCW },
+  { "FQB",     OPCAT_6309 |
+               OPCAT_PSEUDO,      PSEUDO_FCQ },
   { "GLOBAL",  OPCAT_PSEUDO,      PSEUDO_PUB },
   { "IF",      OPCAT_PSEUDO,      PSEUDO_IF },
   { "IFC",     OPCAT_PSEUDO,      PSEUDO_IFC },
@@ -3862,6 +3868,12 @@ if (dwOptions & OPTION_LPA)             /* if in patch mode                  */
           putlist("-%04X", oldlc + codeptr - 1);
         putlist("\n");
         break;
+      case PSEUDO_FCQ :
+        putlist("dword %04x", oldlc);
+        if (codeptr > 2)
+          putlist("-%04X", oldlc + codeptr - 1);
+        putlist("\n");
+        break;
       }
     }
   if (codeptr > 0)                      /* if there are code bytes           */
@@ -5325,6 +5337,22 @@ switch (co)
       if (!(dwOptions & OPTION_TSC))
         skipspace();
       putword((unsigned short)scanexpr(0, &p));
+      if (unknown && pass == 2)
+        error |= ERR_LABEL_UNDEF; 
+      if (!(dwOptions & OPTION_TSC))
+        skipspace();     
+      } while (*srcptr == ',');
+    break;
+  case PSEUDO_FCQ :                     /* [label] FCQ,FQB  expr[,expr...]   */
+    setlabel(lp);
+    generating = 1;
+    do
+      {
+      if (*srcptr == ',')
+        srcptr++;
+      if (!(dwOptions & OPTION_TSC))
+        skipspace();
+      putdword(scanexpr(0, &p));
       if (unknown && pass == 2)
         error |= ERR_LABEL_UNDEF; 
       if (!(dwOptions & OPTION_TSC))
