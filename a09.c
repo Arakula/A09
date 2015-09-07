@@ -223,6 +223,7 @@
    v1.30  22/06/15 PHASE/DEPHASE pseudo-ops added
    v1.31  15/07/15 6301/6303 support added
    v1.32  19/08/15 FCQ/FQB pseudo-ops added
+   v1.33  28/08/15 Macro problems (found by Bob Grieb) fixed
 
 */
 
@@ -238,8 +239,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.32"
-#define VERSNUM      "$0120"            /* can be queried as &VERSION        */
+#define VERSION      "1.33"
+#define VERSNUM      "$0121"            /* can be queried as &VERSION        */
 
 #define UNIX 0                          /* set to != 0 for UNIX specials     */
 
@@ -273,8 +274,15 @@ short nfnms;                            /* # loaded files                    */
                                         /* special bits in lvl :             */
 #define LINCAT_MACDEF       0x20        /* macro definition                  */
 #define LINCAT_MACEXP       0x40        /* macro expansion                   */
+#define LINCAT_MACINV       (0x20|0x40) /* macro invocation                  */
 #define LINCAT_INVISIBLE    0x80        /* does not appear in listing        */
 #define LINCAT_LVLMASK      0x1F        /* mask for line levels (0..31)      */
+
+                                        /* Helpers for the above             */
+#define LINE_IS_MACDEF(lvl) ((lvl & LINCAT_MACINV) == LINCAT_MACDEF)
+#define LINE_IS_MACEXP(lvl) ((lvl & LINCAT_MACINV) == LINCAT_MACEXP)
+#define LINE_IS_MACINV(lvl) ((lvl & LINCAT_MACINV) == LINCAT_MACINV)
+#define LINE_IS_INVISIBLE(lvl) (lvl & LINCAT_INVISIBLE)
 
 struct linebuf *rootline = NULL;        /* pointer to 1st line of the file   */
 struct linebuf *curline = NULL;         /* pointer to currently processed ln */
@@ -3817,12 +3825,16 @@ void outlist(struct oprecord *op)
 {
 int i;
 
-if ((curline->lvl & LINCAT_INVISIBLE) &&/* don't list invisible lines       */
+if (LINE_IS_INVISIBLE(curline->lvl) &&  /* don't list invisible lines        */
     !(dwOptions & OPTION_INV))
   return;
 
-if ((curline->lvl & LINCAT_MACEXP) &&   /* don't list macro expansions if   */
-    !(dwOptions & OPTION_EXP))          /* not explicitly requested         */
+if (LINE_IS_MACINV(curline->lvl) &&     /* don't list macro invocations if   */
+    !(dwOptions & OPTION_MAC))          /* not explicitly requested          */
+  return;
+
+if (LINE_IS_MACEXP(curline->lvl) &&     /* don't list macro expansions if    */
+    !(dwOptions & OPTION_EXP))          /* not explicitly requested          */
   return;
 
 if ((curline->lvl & LINCAT_LVLMASK) &&  /* if level 1..31                    */
@@ -3892,11 +3904,11 @@ else if ((warning & WRN_OPT) &&         /* excessive branch, TSC style       */
     (dwOptions & OPTION_TSC) &&         
     (dwOptions & OPTION_WAR))
   putlist(">");
-else if (curline->lvl & LINCAT_MACDEF)  /* if in macro definition            */
+else if (LINE_IS_MACDEF(curline->lvl))  /* if in macro definition            */
   putlist("#");                         /* prefix line with #                */
-else if (curline->lvl & LINCAT_MACEXP)  /* if in macro expansion             */
+else if (LINE_IS_MACEXP(curline->lvl))  /* if in macro expansion             */
   putlist("+");                         /* prefix line with +                */
-else if (curline->lvl & LINCAT_INVISIBLE)
+else if (LINE_IS_INVISIBLE(curline->lvl))
   putlist("-");
 else if (curline->txt)                  /* otherwise                         */
   putlist(" ");                         /* prefix line with blank            */
@@ -5941,7 +5953,8 @@ struct relocrecord p = {0};
 
 if ((listing & LIST_ON) &&              /* if listing pass 1                 */
     (dwOptions & OPTION_LIS) &&
-    (dwOptions & OPTION_LP1))
+    (dwOptions & OPTION_LP1) &&
+    (dwOptions & OPTION_MAC))
   outlist(NULL);                        /* show macro invocation BEFORE      */
                                         /* processing the expansions         */
 
@@ -6222,7 +6235,7 @@ codeptr = 0;
 
 void processline()
 {
-struct symrecord *lp, *lpmac;
+struct symrecord *lp, *lpmac = NULL;
 struct oprecord *op = NULL;
 int co;
 unsigned short cat;
@@ -6279,7 +6292,8 @@ if ((isalnum(*srcptr)) ||
     if (op->cat != OPCAT_PSEUDO)
       {
       setlabel(lp);
-      generating = 1;
+      if (!inMacro)
+        generating = 1;
       }
     co = op->code;
     cat = op->cat;
@@ -6393,7 +6407,10 @@ if ((isalnum(*srcptr)) ||
     if (lpmac && lpmac->cat == SYMCAT_MACRO)
       {
       if (pass == 1)                    /* if in pass 1                      */
+        {
+        curline->lvl |= LINCAT_MACINV;  /* mark as macro invocation          */
         expandmacro(lp, lpmac);         /* expand macro below current line   */
+        }
       }
     else
       error |= ERR_ILLEGAL_MNEM;
