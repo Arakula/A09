@@ -224,6 +224,7 @@
    v1.31  15/07/15 6301/6303 support added
    v1.32  19/08/15 FCQ/FQB pseudo-ops added
    v1.33  28/08/15 Macro problems (found by Bob Grieb) fixed
+   v1.34  09/09/15 Macro problems (found by Bob Grieb) fixed
 
 */
 
@@ -239,8 +240,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.33"
-#define VERSNUM      "$0121"            /* can be queried as &VERSION        */
+#define VERSION      "1.34"
+#define VERSNUM      "$0122"            /* can be queried as &VERSION        */
 
 #define UNIX 0                          /* set to != 0 for UNIX specials     */
 
@@ -5274,7 +5275,8 @@ switch (co)
     break;
   case PSEUDO_FCB :                     /* [label] FCB expr[,expr...]        */
     setlabel(lp);
-    generating = 1;
+    if (!inMacro)
+      generating = 1;
     do
       {
       if (*srcptr == ',')
@@ -5301,6 +5303,8 @@ switch (co)
     break; 
   case PSEUDO_FCC :                     /* [label] FCC expr[,expr...]        */
     setlabel(lp);
+    if (!inMacro)
+      generating = 1;
     if (!(dwOptions & OPTION_TSC))
       skipspace();
     if (!(dwOptions & OPTION_TSC))      /* if standard                       */
@@ -5341,7 +5345,8 @@ switch (co)
     break;
   case PSEUDO_FCW :                     /* [label] FCW,FDB  expr[,expr...]   */
     setlabel(lp);
-    generating = 1;
+    if (!inMacro)
+      generating = 1;
     do
       {
       if (*srcptr == ',')
@@ -5357,7 +5362,8 @@ switch (co)
     break;
   case PSEUDO_FCQ :                     /* [label] FCQ,FQB  expr[,expr...]   */
     setlabel(lp);
-    generating = 1;
+    if (!inMacro)
+      generating = 1;
     do
       {
       if (*srcptr == ',')
