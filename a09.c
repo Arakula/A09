@@ -186,7 +186,7 @@
                    assumption in scanlabel() that forward references have
                    a higher memory location than the current address.
                    Thanks to Peter from Australia for pointing this out!
-   v1.17  08/08/05 made tests for above problem more rigorous; now ANY forward
+   v1.17  05/08/08 made tests for above problem more rigorous; now ANY forward
                    reference to a label that's not yet defined is treated as
                    uncertain.
                    Removed a nasty bug that caused the following code to produce
@@ -197,34 +197,36 @@
                    OPT NOL changed to OPT NO1 to allow implementing OPT LIS|NOL.
                    OPT LIS*|NOL added
                    Thanks to Peter from Australia for pointing these out!
-   v1.18  09/08/05 backward search for local labels now searches for "<= local
+   v1.18  05/08/09 backward search for local labels now searches for "<= local
                    address" instead of "< local address"
                    Thanks to Peter from Australia for pointing this out!
                    Added INCD / DECD convenience mnemonics
                    (realized as ADDD/SUBD 1)
-   v1.19  10/08/05 Added a bunch of 6800-style mnemonics; if they conflict
+   v1.19  05/08/10 Added a bunch of 6800-style mnemonics; if they conflict
                    with 6809 mnemonics ("INC A" for example), they are only
                    active in TSC mode
-   v1.20  16/08/05 changed special checks for
+   v1.20  05/08/16 changed special checks for
                      "0,-[-]indexreg" and "0,indexreg+[+]"
                    to include all known labels and changed the scope to
                      ",[-[-]]indexreg[+[+]]"
-   v1.21  21/02/06 Bug in "xxx  >0,reg" found by Margus Kliimask
-   v1.22  03/09/08 Addded BIN(ARY) pseudo-op to include binary files
-   v1.23  13/02/09 6800 code generation added
+   v1.21  06/02/21 Bug in "xxx  >0,reg" found by Margus Kliimask
+   v1.22  08/09/03 Addded BIN(ARY) pseudo-op to include binary files
+   v1.23  09/02/13 6800 code generation added
                    accept multiple input files (first one defines default
                      output and listing file names)
-   v1.24  13/02/09 made compilable with gcc
-   v1.25  05/03/09 6800 alternate mnemonics work better now
-   v1.26  14/03/09 assembling DOS format files in Loonix works better now
-   v1.27  20/01/10 LPA/NLP options added
-   v1.28  21/04/10 INCD/DECD produced invalid code
-   v1.29  19/06/15 M01/M02/M03/M08 options added
-   v1.30  22/06/15 PHASE/DEPHASE pseudo-ops added
+   v1.24  09/02/13 made compilable with gcc
+   v1.25  09/03/05 6800 alternate mnemonics work better now
+   v1.26  09/03/14 assembling DOS format files in Loonix works better now
+   v1.27  10/01/20 LPA/NLP options added
+   v1.28  10/04/21 INCD/DECD produced invalid code
+   v1.29  15/06/19 M01/M02/M03/M08 options added
+   v1.30  15/06/22 PHASE/DEPHASE pseudo-ops added
    v1.31  15/07/15 6301/6303 support added
-   v1.32  19/08/15 FCQ/FQB pseudo-ops added
-   v1.33  28/08/15 Macro problems (found by Bob Grieb) fixed
-   v1.34  09/09/15 Macro problems (found by Bob Grieb) fixed
+   v1.32  15/08/19 FCQ/FQB pseudo-ops added
+   v1.33  15/08/28 Macro problems (found by Bob Grieb) fixed
+   v1.34  15/09/09 More macro problems (found by Bob Grieb) fixed
+   v1.35  15/09/11 Corrected an oversight in the special checks for
+                   "0,-[-]indexreg" and "0,indexreg+[+]"
 
 */
 
@@ -240,8 +242,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.34"
-#define VERSNUM      "$0122"            /* can be queried as &VERSION        */
+#define VERSION      "1.35"
+#define VERSNUM      "$0123"            /* can be queried as &VERSION        */
 
 #define UNIX 0                          /* set to != 0 for UNIX specials     */
 
@@ -2444,14 +2446,9 @@ srcptr--;
 void skipspace()
 {
 char c;
-do
-  {
-  c = *srcptr++;
-  } while (c == ' ' || c == '\t');
-srcptr--;
+while ((c = *srcptr) == ' ' || c == '\t')
+  srcptr++;
 } 
-
-long scanexpr(int, struct relocrecord *);
 
 /*****************************************************************************/
 /* scandecimal : scans a decimal number                                      */
@@ -2668,6 +2665,8 @@ else switch (c)
   }
 return 0;
 }
+
+long scanexpr(int, struct relocrecord *);
 
 /*****************************************************************************/
 /* scanfactor : scans an expression factor                                   */
@@ -2966,6 +2965,27 @@ return t;
 }
 
 /*****************************************************************************/
+/* isindexreg : returns whether on an index register                         */
+/*****************************************************************************/
+
+int isindexreg()
+{
+switch (toupper(*srcptr))
+  {
+  case 'X':
+  case 'Y':
+  case 'U':
+  case 'S':
+    return 1;
+  case 'W' :
+    if (dwOptions & OPTION_H09)
+      return 1;
+    break;
+  }  
+return 0;
+}
+
+/*****************************************************************************/
 /* scanindexreg : scans an index register                                    */
 /*****************************************************************************/
 
@@ -3240,13 +3260,18 @@ switch (toupper(c))
       srcptr++;
       if (!(dwOptions & OPTION_TSC))
         skipspace();
+#if 1
+      /* The TSC 6809 assembler, according to its documentation,
+         allows constructs like "0,-[-]reg" or "0,reg+[+]", i.e., it treats
+         "zero offset" like "no offset". Duplicated here. */
       if ((operand == 0) &&             /* special for "0,-[-]indexreg       */
           (!unknown) && (certain) &&    /*         and "0,indexreg[+[+]]     */
-          (opsize < 3) &&               /* but NOT for ">0,indexreg"!        */
-          ((*srcptr == '-') ||
-           (scanindexreg() /* && (srcptr[1] == '+') */ )))
+          (opsize < 2) &&               /* but NOT for ">0,indexreg"!        */
+          (*srcptr == '-' ||
+           (isindexreg() && srcptr[1] == '+')))
         scanspecial();
       else
+#endif
         scanindexed();
       }
     else
