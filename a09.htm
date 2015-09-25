@@ -317,6 +317,12 @@ of these programs). Apart from these, it knows the following directives:</p>
     RELASMB documentation)</td>
   </tr>
   <tr>
+    <td valign="top"><b>FILL <i>value</i>,<i>bytecount</i></b></td>
+	<td valign="top">writes the 8-bit value <b><i>value</i></b> into <b><i>bytecount</i></b> consecutive memory locations<br />
+	<b>Note:</b> if <b><i>bytecount</i></b> exceeds 255 and <b>OPT MUL</b> (see above) is set, only the first 255 bytes are shown
+	in the listing.</td>
+  </tr>
+  <tr>
     <td valign="top"><b>IFD, IFND <i>symbol</i>[,<i>skipcount</i>]</b></td>
 	<td valign="top">assembles the block up to the next <b>ELSE</b> or <b>ENDIF</b>
 	directive if the symbol is (not) defined.<br>
@@ -338,9 +344,12 @@ of these programs). Apart from these, it knows the following directives:</p>
     documentation)</td>
   </tr>
   <tr>
-    <td valign="top"><b>RZB <i>nnn</i></b></td>
-    <td valign="top">is implemented as an alias to the <b>RMB</b> directive (see ASMB 
-    documentation)</td>
+    <td valign="top"><b>RZB</b>, <b>BSZ</b>, <b>ZMB <i>nnn</i></b></td>
+    <td valign="top">works like the <b>RMB</b> directive (see ASMB documentation), but
+    it doesn't only reserve memory, but also zeroes the reserved bytes<br />
+	<b>Note:</b> if <b><i>nnn</i></b> exceeds 255 and <b>OPT MUL</b> (see above) is set, only the first 255 bytes are shown
+	in the listing.</td>
+    </td>
   </tr>
   <tr>
     <td valign="top"><b>SETLI <i>nnn</i></b></td>

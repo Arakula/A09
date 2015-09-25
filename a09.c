@@ -227,6 +227,9 @@
    v1.34  15/09/09 More macro problems (found by Bob Grieb) fixed
    v1.35  15/09/11 Corrected an oversight in the special checks for
                    "0,-[-]indexreg" and "0,indexreg+[+]"
+   v1.36  15/09/25 BSZ,ZMB pseudo-ops added (AS9-compatible alternatives
+                     to RZB)
+                   FILL <value>,<byte_count> psudo-op added
 
 */
 
@@ -242,8 +245,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.35"
-#define VERSNUM      "$0123"            /* can be queried as &VERSION        */
+#define VERSION      "1.36"
+#define VERSNUM      "$0124"            /* can be queried as &VERSION        */
 
 #define UNIX 0                          /* set to != 0 for UNIX specials     */
 
@@ -381,6 +384,7 @@ struct oprecord
 #define PSEUDO_PHASE         45
 #define PSEUDO_DEPHASE       46
 #define PSEUDO_FCQ           47
+#define PSEUDO_FILL          48
 
 struct oprecord optable09[]=
   {
@@ -469,6 +473,7 @@ struct oprecord optable09[]=
   { "BRA",     OPCAT_SBRANCH,     0x20 },
   { "BRN",     OPCAT_SBRANCH,     0x21 },
   { "BSR",     OPCAT_SBRANCH,     0x8d },
+  { "BSZ",     OPCAT_PSEUDO,      PSEUDO_RZB },  // AS9 style
   { "BVC",     OPCAT_SBRANCH,     0x28 },
   { "BVS",     OPCAT_SBRANCH,     0x29 },
   { "CBA",     OPCAT_FOURBYTE,    0x3404a1e0 },
@@ -575,6 +580,7 @@ struct oprecord optable09[]=
                OPCAT_PSEUDO,      PSEUDO_FCQ },
   { "FCW",     OPCAT_PSEUDO,      PSEUDO_FCW },
   { "FDB",     OPCAT_PSEUDO,      PSEUDO_FCW },
+  { "FILL",    OPCAT_PSEUDO,      PSEUDO_FILL },
   { "FQB",     OPCAT_6309 |
                OPCAT_PSEUDO,      PSEUDO_FCQ },
   { "GLOBAL",  OPCAT_PSEUDO,      PSEUDO_PUB },
@@ -847,6 +853,7 @@ struct oprecord optable09[]=
   { "TXS",     OPCAT_TWOBYTE,     0x1f14 },
   { "TYS",     OPCAT_FOURBYTE,    0x34203540 },  /* PSHS Y/PULS S */
   { "WAI",     OPCAT_TWOBYTE,     0x3cff },
+  { "ZMB",     OPCAT_PSEUDO,      PSEUDO_RZB },
 };
 
 struct oprecord optable00[]=
@@ -891,6 +898,7 @@ struct oprecord optable00[]=
   { "BPL",     OPCAT_SBRANCH,     0x2a },
   { "BRA",     OPCAT_SBRANCH,     0x20 },
   { "BSR",     OPCAT_SBRANCH,     0x8d },
+  { "BSZ",     OPCAT_PSEUDO,      PSEUDO_RZB },  // AS9 style
   { "BVC",     OPCAT_SBRANCH,     0x28 },
   { "BVS",     OPCAT_SBRANCH,     0x29 },
   { "CBA",     OPCAT_ONEBYTE,     0x11 },
@@ -936,6 +944,7 @@ struct oprecord optable00[]=
   { "FCC",     OPCAT_PSEUDO,      PSEUDO_FCC },
   { "FCW",     OPCAT_PSEUDO,      PSEUDO_FCW },
   { "FDB",     OPCAT_PSEUDO,      PSEUDO_FCW },
+  { "FILL",    OPCAT_PSEUDO,      PSEUDO_FILL },
   { "GLOBAL",  OPCAT_PSEUDO,      PSEUDO_PUB },
   { "IF",      OPCAT_PSEUDO,      PSEUDO_IF },
   { "IFC",     OPCAT_PSEUDO,      PSEUDO_IFC },
@@ -1043,6 +1052,7 @@ struct oprecord optable00[]=
   { "TTL",     OPCAT_PSEUDO,      PSEUDO_NAM },
   { "TXS",     OPCAT_ONEBYTE,     0x35 },
   { "WAI",     OPCAT_ONEBYTE,     0x3e },
+  { "ZMB",     OPCAT_PSEUDO,      PSEUDO_RZB },
   };
 
 struct oprecord optable01[]=
@@ -1093,6 +1103,7 @@ struct oprecord optable01[]=
   { "BRA",     OPCAT_SBRANCH,     0x20 },
   { "BRN",     OPCAT_SBRANCH,     0x21 },
   { "BSR",     OPCAT_SBRANCH,     0x8d },
+  { "BSZ",     OPCAT_PSEUDO,      PSEUDO_RZB },  // AS9 style
   { "BVC",     OPCAT_SBRANCH,     0x28 },
   { "BVS",     OPCAT_SBRANCH,     0x29 },
   { "CBA",     OPCAT_ONEBYTE,     0x11 },
@@ -1140,6 +1151,7 @@ struct oprecord optable01[]=
   { "FCC",     OPCAT_PSEUDO,      PSEUDO_FCC },
   { "FCW",     OPCAT_PSEUDO,      PSEUDO_FCW },
   { "FDB",     OPCAT_PSEUDO,      PSEUDO_FCW },
+  { "FILL",    OPCAT_PSEUDO,      PSEUDO_FILL },
   { "GLOBAL",  OPCAT_PSEUDO,      PSEUDO_PUB },
   { "IF",      OPCAT_PSEUDO,      PSEUDO_IF },
   { "IFC",     OPCAT_PSEUDO,      PSEUDO_IFC },
@@ -1263,6 +1275,7 @@ struct oprecord optable01[]=
   { "WAI",     OPCAT_ONEBYTE,     0x3e },
   { "XGDX",    OPCAT_6301 |
                OPCAT_ONEBYTE,     0x18 },
+  { "ZMB",     OPCAT_PSEUDO,      PSEUDO_RZB },
   };
 
 /* expression categories...
@@ -3893,11 +3906,15 @@ if (dwOptions & OPTION_LPA)             /* if in patch mode                  */
       case PSEUDO_ORG :
         putlist("insert %04X \\        ORG $%04X\n", loccounter, loccounter);
         break;
+      case PSEUDO_RZB :
+      case PSEUDO_FILL :
       case PSEUDO_FCB :
       case PSEUDO_FCC :
         putlist("data %04X", oldlc);
         if (codeptr > 1)
           putlist("-%04X", oldlc + codeptr - 1);
+        /* we got a little conceptual problem here... if RZB or FILL reserve
+        more than sizeof(codebuf) bytes, this is not correctly reflected. */
         putlist("\n");
         break;
       case PSEUDO_FCW :
@@ -3940,7 +3957,7 @@ else if (curline->txt)                  /* otherwise                         */
   putlist(" ");                         /* prefix line with blank            */
 
 if (codeptr > 0)
-  putlist("%04X ", (unsigned short)(oldlc + phase));
+  putlist("%04X ", (unsigned short)(oldlc + ((dwOptions & OPTION_LPA) ? 0 : phase)));
 else if (*curline->txt)
   putlist("     ");
 else
@@ -3977,7 +3994,7 @@ else                                    /* otherwise                         */
 putlist("\n");                          /* send newline                      */
 
 if (codeptr > MAXLISTBYTES &&           /* if there are additional bytes,    */
-    (dwOptions & OPTION_MUL))
+    (dwOptions & (OPTION_LPA | OPTION_MUL)))
   {                                     /* print them.                       */
   if (dwOptions & OPTION_LPA)           /* if in patch mode                  */
     putlist("patch");                   /* write "patch"                     */
@@ -3986,12 +4003,20 @@ if (codeptr > MAXLISTBYTES &&           /* if there are additional bytes,    */
     if (!(i % MAXLISTBYTES))
       {
       if (i != MAXLISTBYTES)
+        {
         putlist("\n");
+        if (dwOptions & OPTION_LPA &&   /* if in patch mode                  */
+            i < codeptr)                /* and bytes follow                  */
+          putlist("patch");             /* write "patch"                     */
+        }
       if (dwOptions & OPTION_NUM)       /* if number output                  */
         putlist("     ");
       if (!absmode)
         putlist(" ");
-      putlist(" %04X ", oldlc + i);
+      putlist(" %04X ",
+              (unsigned short)(oldlc +
+                               ((dwOptions & OPTION_LPA) ? 0 : phase) +
+                               i));
       }
     if (dwOptions & OPTION_LPA)         /* if in patch mode                  */
       putlist("%02X ", codebuf[i]);
@@ -4051,7 +4076,9 @@ if (lp)
 
 void putbyte(unsigned char b)
 {
-codebuf[codeptr++] = b;                 /* and finally put the byte there.   */
+if (codeptr < sizeof(codebuf))
+  codebuf[codeptr] = b;
+codeptr++;
 }
 
 /*****************************************************************************/
@@ -5152,7 +5179,7 @@ return 1;                               /* unknown option                    */
 void pseudoop(int co, struct symrecord * lp)
 {
 int i, j;
-char c;
+char c, fillc;
 struct relocrecord p = {0};
 
 if (common &&                           /* if in COMMON definition mode      */
@@ -5192,8 +5219,27 @@ switch (co)
     else
       error |= ERR_EXPR;                /* must be paired                    */
     break;
+  case PSEUDO_FILL :                    /* [label] FILL <value>,<byte_count> */
+    operand = scanexpr(0, &p);
+    if (unknown)
+      error |= ERR_LABEL_UNDEF;
+    if (!(dwOptions & OPTION_TSC))
+      skipspace();
+    if (*srcptr == ',')                 /* skip count?                       */
+      {
+      fillc = (char)operand;
+      srcptr++;
+      if (!(dwOptions & OPTION_TSC))
+        skipspace();
+      goto DoFill;
+      }
+    else
+      error |= ERR_EXPR;
+    break;
   case PSEUDO_RMB :                     /* [label] RMB <absolute expression> */
   case PSEUDO_RZB :                     /* [label] RZB <absolute expression> */
+    fillc = 0;
+  DoFill:
     operand = scanexpr(0, &p);
     if (unknown)
       error |= ERR_LABEL_UNDEF;
@@ -5218,9 +5264,19 @@ switch (co)
     setlabel(lp);
     if (generating && pass == 2)
       {
-      if (co != 0 || outmode == OUT_BIN)
-        for (i = 0; i < operand; i++)
-          outbyte(0, i);
+      if (co != PSEUDO_RMB || outmode == OUT_BIN)
+        {
+        if (co != PSEUDO_RMB)           /* if filling with a value,          */
+          {                             /* fill codebuf first                */
+          if (!inMacro)
+            generating = 1;
+          for (i = 0; i < operand && i < sizeof(codebuf); i++)
+            putbyte(fillc);
+          operand -= i;
+          }
+        for (i = 0; i < operand; i++)   /* if too much, output rest directly */
+          outbyte(fillc, i);
+        }
       else switch (outmode)
         {
         case OUT_SREC :                 /* Motorola S51-09 ?                 */
