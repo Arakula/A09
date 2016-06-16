@@ -1,7 +1,7 @@
 /* A09, 6809 Assembler. 
    
    (C) Copyright 1993,1994 L.C. Benschop. 
-   Parts (C) Copyright 2001-2015 H. Seib.
+   Parts (C) Copyright 2001-2016 H. Seib.
    This version of the program is distributed under the terms and conditions 
    of the GNU General Public License version 2. See file the COPYING for details.   
    THERE IS NO WARRANTY ON THIS PROGRAM. 
@@ -104,6 +104,7 @@
         | M09         MC6809 mode
     TXT | NTX*        Print text table
     LPA | LNP*        Listing in f9dasm patch format
+    DLM | NDL*        Define label on macro expansion
     * denotes default value
 
     
@@ -230,6 +231,9 @@
    v1.36  15/09/25 BSZ,ZMB pseudo-ops added (AS9-compatible alternatives
                      to RZB)
                    FILL <value>,<byte_count> psudo-op added
+   v1.36  16/06/16 DLM|NDL* options added; see
+                     https://github.com/Arakula/A09/issues/1
+                   for details.
 
 */
 
@@ -245,8 +249,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.36"
-#define VERSNUM      "$0124"            /* can be queried as &VERSION        */
+#define VERSION      "1.37"
+#define VERSNUM      "$0125"            /* can be queried as &VERSION        */
 
 #define UNIX 0                          /* set to != 0 for UNIX specials     */
 
@@ -1465,6 +1469,7 @@ long relhdrfoff;                        /* FLEX Relocatable Global Hdr Offset*/
 #define OPTION_TXT    0x00400000L       /* print text table                  */
 #define OPTION_LIS    0x00800000L       /* print assembler output listing    */
 #define OPTION_LPA    0x01000000L       /* listing in f9dasm patch format    */
+#define OPTION_DLM    0x02000000L       /* define label on macro expansion   */
 
 struct
   {
@@ -1524,6 +1529,8 @@ struct
   { "NOL",           0, OPTION_LIS },
   { "LPA",  OPTION_LPA, OPTION_NUM | OPTION_CLL }, // LPA inhibits NUM / CLL!
   { "NLP",           0, OPTION_LPA },
+  { "DLM",  OPTION_DLM,          0 },
+  { "NDL",           0, OPTION_DLM },
   };
 
 unsigned long dwOptions =               /* options flags, init to default    */
@@ -6496,6 +6503,8 @@ if ((isalnum(*srcptr)) ||
       if (pass == 1)                    /* if in pass 1                      */
         {
         curline->lvl |= LINCAT_MACINV;  /* mark as macro invocation          */
+        if (dwOptions & OPTION_DLM)
+          setlabel(lp);
         expandmacro(lp, lpmac);         /* expand macro below current line   */
         }
       }
