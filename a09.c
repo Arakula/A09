@@ -1,7 +1,7 @@
 /* A09, 6809 Assembler. 
    
    (C) Copyright 1993,1994 L.C. Benschop. 
-   Parts (C) Copyright 2001-2016 H. Seib.
+   Parts (C) Copyright 2001-2018 H. Seib.
    This version of the program is distributed under the terms and conditions 
    of the GNU General Public License version 2. See file the COPYING for details.   
    THERE IS NO WARRANTY ON THIS PROGRAM. 
@@ -231,9 +231,11 @@
    v1.36  15/09/25 BSZ,ZMB pseudo-ops added (AS9-compatible alternatives
                      to RZB)
                    FILL <value>,<byte_count> psudo-op added
-   v1.36  16/06/16 DLM|NDL* options added; see
+   v1.37  16/06/16 DLM|NDL* options added; see
                      https://github.com/Arakula/A09/issues/1
                    for details.
+   v1.38  18/12/06 corrected 6801/6301 errors in JSR/STD processing
+                   as reported by M. Hepperle - thank you!
 
 */
 
@@ -249,8 +251,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.37"
-#define VERSNUM      "$0125"            /* can be queried as &VERSION        */
+#define VERSION      "1.38"
+#define VERSNUM      "$0126"            /* can be queried as &VERSION        */
 
 #define UNIX 0                          /* set to != 0 for UNIX specials     */
 
@@ -1170,7 +1172,8 @@ struct oprecord optable01[]=
   { "INS",     OPCAT_ONEBYTE,     0x31 },
   { "INX",     OPCAT_ONEBYTE,     0x08 },
   { "JMP",     OPCAT_IDXEXT,      0x4e },
-  { "JSR",     OPCAT_IDXEXT,      0x8d },  // maybe OPCAT_DBLREG1BYTE?
+  { "JSR",     OPCAT_NOIMM |
+               OPCAT_DBLREG1BYTE, 0x8d },
   { "LDA",     OPCAT_ACCARITH,    0x86 },
   { "LDAA",    OPCAT_ARITH,       0x86 },
   { "LDAB",    OPCAT_ARITH,       0xc6 },
@@ -1250,7 +1253,7 @@ struct oprecord optable01[]=
   { "STAB",    OPCAT_NOIMM |
                OPCAT_ARITH,       0xc7 },
   { "STD",     OPCAT_NOIMM |
-               OPCAT_DBLREG1BYTE, 0xce },
+               OPCAT_DBLREG1BYTE, 0xcd },
   { "STS",     OPCAT_NOIMM |
                OPCAT_DBLREG1BYTE, 0x8f },
   { "STTL",    OPCAT_PSEUDO,      PSEUDO_STTL },
