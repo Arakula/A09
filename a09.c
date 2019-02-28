@@ -246,6 +246,7 @@ or http://nadeausoftware.com/articles/2012/01/c_c_tip_how_use_compiler_predefine
 || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)))
 	/* UNIX-style OS. ------------------------------------------- */
 #define UNIX 1                          /* set to != 0 for UNIX specials     */
+#include <unistd.h>	/* import unlink */
 #else
 #define UNIX 0                          /* set to != 0 for UNIX specials     */
 #endif
