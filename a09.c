@@ -239,10 +239,24 @@
 
 */
 
+/* @see https://stackoverflow.com/questions/2989810/which-cross-platform-preprocessor-defines-win32-or-win32-or-win32
+or http://nadeausoftware.com/articles/2012/01/c_c_tip_how_use_compiler_predefined_macros_detect_operating_system
+*/
+#if !defined(_WIN32) && !defined(_WIN64) && (defined(__unix__) \
+|| defined(__unix) || (defined(__APPLE__) && defined(__MACH__)))
+	/* UNIX-style OS. ------------------------------------------- */
+#define UNIX 1                          /* set to != 0 for UNIX specials     */
+#include <unistd.h>	/* import unlink */
+#else
+#define UNIX 0                          /* set to != 0 for UNIX specials     */
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#if !UNIX
 #include <malloc.h>
+#endif
 #include <stdarg.h>
 #include <stdlib.h>
 #include <time.h>
@@ -254,7 +268,6 @@
 #define VERSION      "1.38"
 #define VERSNUM      "$0126"            /* can be queried as &VERSION        */
 
-#define UNIX 0                          /* set to != 0 for UNIX specials     */
 
 #define MAXLABELS    8192
 #define MAXMACROS    1024
