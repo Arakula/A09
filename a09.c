@@ -236,38 +236,41 @@
                    for details.
    v1.38  18/12/06 corrected 6801/6301 errors in JSR/STD processing
                    as reported by M. Hepperle - thank you!
+   v1.39  19/02/28 Improved gcc / clang compatibility,
+                   based on Steve Byan's pull request here:
+                   https://github.com/Arakula/A09/pull/2
 
 */
 
 /* @see https://stackoverflow.com/questions/2989810/which-cross-platform-preprocessor-defines-win32-or-win32-or-win32
-or http://nadeausoftware.com/articles/2012/01/c_c_tip_how_use_compiler_predefined_macros_detect_operating_system
-*/
-#if !defined(_WIN32) && !defined(_WIN64) && (defined(__unix__) \
-|| defined(__unix) || (defined(__APPLE__) && defined(__MACH__)))
-	/* UNIX-style OS. ------------------------------------------- */
-#define UNIX 1                          /* set to != 0 for UNIX specials     */
-#include <unistd.h>	/* import unlink */
+   or http://nadeausoftware.com/articles/2012/01/c_c_tip_how_use_compiler_predefined_macros_detect_operating_system */
+#if !defined(_WIN32) && !defined(_WIN64) && \
+    (defined(__unix__) || defined(__unix) || \
+     defined(__linux__) || \
+    (defined(__APPLE__) && defined(__MACH__)))
+#define UNIX 1                          /* UNIX specials                     */
 #else
-#define UNIX 0                          /* set to != 0 for UNIX specials     */
+#define UNIX 0                          /* Windows-specific                  */
 #endif
 
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
-#if !UNIX
-#include <malloc.h>
-#endif
 #include <stdarg.h>
 #include <stdlib.h>
 #include <time.h>
+#if UNIX
+#include <unistd.h>
+#else
+#include <malloc.h>
+#endif
 
 /*****************************************************************************/
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.38"
-#define VERSNUM      "$0126"            /* can be queried as &VERSION        */
-
+#define VERSION      "1.39"
+#define VERSNUM      "$0127"            /* can be queried as &VERSION        */
 
 #define MAXLABELS    8192
 #define MAXMACROS    1024
@@ -3976,7 +3979,7 @@ else if (LINE_IS_MACEXP(curline->lvl))  /* if in macro expansion             */
   putlist("+");                         /* prefix line with +                */
 else if (LINE_IS_INVISIBLE(curline->lvl))
   putlist("-");
-else if (curline->txt)                  /* otherwise                         */
+else if (*curline->txt)                 /* otherwise                         */
   putlist(" ");                         /* prefix line with blank            */
 
 if (codeptr > 0)
