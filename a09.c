@@ -1656,6 +1656,7 @@ int optablesize = sizeof(optable09) / sizeof(optable09[0]);
 struct regrecord *regtable = regtable09;/* used register table               */
                                         /* used bit register table           */
 struct regrecord *bitregtable = bitregtable09;
+int bitregtablesize = sizeof(bitregtable09) / sizeof(bitregtable09[0]);
 void scanoperands09(struct relocrecord *pp);
 void (*scanoperands)(struct relocrecord *) = scanoperands09;
 
@@ -2358,7 +2359,8 @@ return 0;
 struct regrecord * findbitreg(char *nm)
 {
 int i;
-for (i = 0; i < (sizeof(bitregtable) / sizeof(bitregtable[0])); i++)
+
+for (i = 0; i < bitregtablesize; i++)
   {
   if (strcmp(bitregtable[i].name,nm) == 0)
     return bitregtable + i;
@@ -5158,6 +5160,7 @@ for (i = 0; i < (sizeof(Options) / sizeof(Options[0])); i++)
         optablesize = sizeof(optable09) / sizeof(optable09[0]);
         regtable = regtable09;
         bitregtable = bitregtable09;
+        bitregtablesize = sizeof(bitregtable09) / sizeof(bitregtable09[0]);
         scanoperands = scanoperands09;
         break;
       case OPTION_H09 :                 /* switch to HD6309 processor        */
@@ -5165,6 +5168,7 @@ for (i = 0; i < (sizeof(Options) / sizeof(Options[0])); i++)
         optablesize = sizeof(optable09) / sizeof(optable09[0]);
         regtable = regtable63;
         bitregtable = bitregtable09;
+        bitregtablesize = sizeof(bitregtable09) / sizeof(bitregtable09[0]);
         scanoperands = scanoperands09;
         break;
       case OPTION_M00 :                 /* switch to MC6800 processor        */
@@ -5172,6 +5176,7 @@ for (i = 0; i < (sizeof(Options) / sizeof(Options[0])); i++)
         optablesize = sizeof(optable00) / sizeof(optable00[0]);
         regtable = regtable00;
         bitregtable = bitregtable00;
+        bitregtablesize = sizeof(bitregtable00) / sizeof(bitregtable00[0]);
         scanoperands = scanoperands00;
         break;
       case OPTION_M01 :                 /* switch to MC6801 processor        */
@@ -5179,6 +5184,7 @@ for (i = 0; i < (sizeof(Options) / sizeof(Options[0])); i++)
         optablesize = sizeof(optable01) / sizeof(optable01[0]);
         regtable = regtable00;
         bitregtable = bitregtable00;
+        bitregtablesize = sizeof(bitregtable00) / sizeof(bitregtable00[0]);
         scanoperands = scanoperands00;
         break;
       case OPTION_H01 :                 /* switch to HD6301 processor        */
@@ -5186,6 +5192,7 @@ for (i = 0; i < (sizeof(Options) / sizeof(Options[0])); i++)
         optablesize = sizeof(optable01) / sizeof(optable01[0]);
         regtable = regtable00;
         bitregtable = bitregtable00;
+        bitregtablesize = sizeof(bitregtable00) / sizeof(bitregtable00[0]);
         scanoperands = scanoperands00;
         break;
       }
@@ -5953,7 +5960,13 @@ switch (co)
     scanname();
     if (!namebuf[0])                    /* name must be given                */
       error |= ERR_EXPR;
-    strncpy(modulename, namebuf, 8);
+#if 0
+    // gcc 9.1.0 flags this as "output may be truncated" (well, duh!), so use sprintf instead
+    strncpy(modulename, namebuf, maxidlen);
+    modulename[maxidlen] = '\0';
+#else
+    sprintf(modulename, "%.*s", maxidlen, namebuf);
+#endif
     break;
   case PSEUDO_BINARY :                  /* BIN[ARY] <filename> ?             */
     nRepNext = 0;                       /* reset eventual repeat             */
@@ -6052,7 +6065,6 @@ char *srcsave = srcptr;
 struct linebuf *cursave = curline;
 int nMacParms = 1;
 int nInString = 0;
-int nMacLine = 1;                       /* current macro line                */
                                         /* current macro line                */
 struct linebuf *pmac = macros[lpmac->value]->next;
 struct linebuf *pcur = curline;         /* current expanded macro line       */
