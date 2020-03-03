@@ -18,7 +18,7 @@
      a09 [-{b|r|s|x|f}filename]|[-c] [-lfilename] [-ooption] [-dsym=value]* sourcefile.
                   
    Options
-   -c suppresses code output
+   -c            suppresses code output
    -bfilename    binary output file name (default name minus a09 suffix plus .bin)
    -rfilename    Flex9 RELASMB-compatible output file name (relocatable)
    -sfilename    s-record output file name (default its a binary file)
@@ -26,7 +26,7 @@
    -ffilename    Flex9 output file name (-"-)
    -lfilename    list file name (default no listing)
    -dsym[=value] define a symbol
-   -oopt defines an option
+   -oopt         defines an option
    
    recognized pseudoops:
     ext        defines an external symbol (relocating mode only)
@@ -239,6 +239,8 @@
    v1.39  19/02/28 Improved gcc / clang compatibility,
                    based on Steve Byan's pull request here:
                    https://github.com/Arakula/A09/pull/2
+   v1.40  20/03/01 Program Counter Relative addressing didn't work correctly
+                   as reported by M. Richemont - thank you!
 
 */
 
@@ -269,8 +271,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.39"
-#define VERSNUM      "$0127"            /* can be queried as &VERSION        */
+#define VERSION      "1.40"
+#define VERSNUM      "$0128"            /* can be queried as &VERSION        */
 
 #define MAXLABELS    8192
 #define MAXMACROS    1024
@@ -4193,11 +4195,19 @@ switch (mode)
     offs = (unsigned short)operand - (loccounter + phase) - codeptr - 2;
     if (offs < -128 || offs >= 128 || opsize == 3 || unknown || !certain)
       {
-      if ((!unknown) && opsize == 2)
-        error |= ERR_RANGE;
-      offs--;
-      opsize = 3;
-      postbyte++;
+      // all unknowns with opsize 0 (w/o < or > prefix) are treated as 16-bit
+      if (opsize == 0 || opsize == 3)  
+        {
+        offs--;
+        opsize = 3;
+        postbyte++;
+        }
+      if (!unknown)
+        {
+        if ((opsize == 2 && (offs < -128 || offs >= 128)) ||
+            (opsize == 3 && (offs < -32768 || offs >= 32768)))
+          error |= ERR_RANGE;
+        }
       }
     putbyte(postbyte);
     if (opsize == 3)
@@ -7078,7 +7088,7 @@ switch (outmode)                        /* look whether object cleanup needed*/
 if (objfile)
   fclose(objfile);
 
-if (errors)
+if (errors && outmode >= OUT_BIN)
   unlink(objname);
 
 return (errors) ? 1 : 0;
