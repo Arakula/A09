@@ -1554,17 +1554,17 @@ struct
   { "NDL",           0, OPTION_DLM },
   };
 
-unsigned long dwOptions =               /* options flags, init to default    */
-    OPTION_M09 |
-    OPTION_MAC |
-    OPTION_SYM |
-    OPTION_MUL |
-    OPTION_DAT |
-    OPTION_WAR |
-    OPTION_CLL |
-    OPTION_LLL |
-    OPTION_REL |
-    OPTION_LIS;
+unsigned long dwOptions =               /* options flags, init to default:   */
+    OPTION_M09 |                        /* MC6809 mode                       */
+    OPTION_MAC |                        /* print macro calling line          */
+    OPTION_SYM |                        /* print symbol table                */
+    OPTION_MUL |                        /* print multiple oc lines           */
+    OPTION_DAT |                        /* print date in listing             */
+    OPTION_WAR |                        /* print warnings                    */
+    OPTION_CLL |                        /* check line length                 */
+    OPTION_LLL |                        /* list library lines                */
+    OPTION_REL |                        /* print relocation table            */
+    OPTION_LIS;                         /* print assembler output listing    */
 
 /*****************************************************************************/
 /* arrays of error/warning messages                                          */
@@ -2439,6 +2439,47 @@ switch (p->sym->cat)                    /* do specials...                    */
 }
 
 /*****************************************************************************/
+/* isValidNameChar : returns whether char is a valid name char               */
+/*****************************************************************************/
+
+char isValidNameChar(char c, char cFirst)
+{
+if (cFirst)                             /* first char of a name is special   */
+  {
+  if ((c >= 'A' && c <= 'Z') ||         /* A..Z is always valid              */
+      (c >= 'a' && c <= 'z'))
+    return 1;
+  if ((cFirst == 1) &&                  /* if explicitly checking for labels */
+      (dwOptions & OPTION_TSC))         /* TSC Assembler allows ONLY letters */
+    return 0;                           /* in 1st position                   */
+  if (c == '.' || c == '_')             /* others allow . and _ as start char*/
+    return 1;
+  if ((dwOptions & OPTION_GAS) &&       /* Gnu as allows $, too              */
+      (c == '$'))
+    return 1;
+  if (cFirst == 1)                      /* if explicitly checking for labels */
+    return 0;                           /* anything else is invalid          */
+  }
+
+if ((c >= '0' && c <= '9') ||           /* normally, labels may consist of   */
+    (c >= 'A' && c <= 'Z') ||           /* the characters A..Z,a..z,_        */
+    (c >= 'a' && c <= 'z') ||
+    (c == '_'))
+  return 1;
+if ((dwOptions & OPTION_GAS) &&         /* Gnu as also allows $              */
+    (c == '$'))
+  return 1;
+if (!(dwOptions & OPTION_TSC) &&        /* non-TSC and non-GNU allows more:  */
+    (c == '.' ||                        /* . $ _ are allowed in names, too   */
+     c == '_' ||
+     c == '$'))
+  return 1;
+
+
+return 0;
+}
+
+/*****************************************************************************/
 /* scanname : scans a name from the input buffer                             */
 /*****************************************************************************/
 
@@ -2447,6 +2488,7 @@ void scanname()
 int i = 0;
 char c;
 char cValid;
+char cFirst = 2;
 
 while (1)
   {
@@ -2455,18 +2497,7 @@ while (1)
       (!(dwOptions & OPTION_GAS)) &&    /* GNU Assembler is case-sensitive   */
       (c >= 'a' && c <= 'z'))
     c -= ('a' - 'A');
-  cValid = 0;                           /* check for validity                */
-  if ((c >= '0' && c <= '9') ||         /* normally, labels may consist of   */
-      (c >= 'A' && c <= 'Z') ||         /* the characters A..Z,a..z,_        */
-      (c >= 'a' && c <= 'z') ||
-      (c == '_'))
-    cValid = 1;
-  if (dwOptions & OPTION_GAS)           /* for GNU AS compatibility,         */
-    {                                   /* the following rules apply:        */
-    if ((c == '.') ||                   /* .$ are valid symbol characters    */
-        (c == '$'))
-     cValid = 1;
-    }
+  cValid = isValidNameChar(c, cFirst);  /* check for validity                */
   if (!cValid)                          /* if invalid character encountered  */
     break;                              /* stop here                         */
 
@@ -2476,6 +2507,7 @@ while (1)
     unamebuf[i] = toupper(c);
     i++;
     }
+  cFirst = 0;
   }
 namebuf[i] = '\0';
 unamebuf[i] = '\0';
@@ -2723,7 +2755,7 @@ long t;
 if (!(dwOptions & OPTION_TSC))
   skipspace();
 c = *srcptr;
-if (isalpha(c))
+if (isValidNameChar(c, 1))
   return (unsigned short)scanlabel(p);
 else if (isdigit(c))
   {
@@ -6393,11 +6425,11 @@ condline = 0;
 if (inMacro)
   curline->lvl |= LINCAT_MACDEF;
 
-if (isalnum(*srcptr))                   /* look for label on line start      */
+if (isValidNameChar(*srcptr, 1))        /* look for label on line start      */
   {
   scanname();
   lp = findsym(namebuf, 1);
-  if (*srcptr == ':')
+  if (*srcptr == ':')                   /* skip : following label            */
     srcptr++;
 
   if ((lp) &&
@@ -6406,11 +6438,10 @@ if (isalnum(*srcptr))                   /* look for label on line start      */
     lp->u.flags |= SYMFLAG_PASSED;
   } 
 skipspace();
-if ((isalnum(*srcptr)) ||
-    ((dwOptions & OPTION_GAS) && (*srcptr == '.')))
+if (isValidNameChar(*srcptr, 1))        /* mnemonic or macro name            */
   {
   scanname();
-  if ((dwOptions & OPTION_H09) &&       /* eventually adjust some mnemonics  */
+  if ((dwOptions & OPTION_H09) &&       /* adjust some mnemonics             */
       ((!strcmp(unamebuf, "ASLD")) ||   /* that are available in the 6309    */
        (!strcmp(unamebuf, "ASRD")) ||   /* but are implemented as (slower)   */
        (!strcmp(unamebuf, "LSLD")) ||   /* convenience instructions on the   */
@@ -6555,8 +6586,15 @@ if ((isalnum(*srcptr)) ||
   }
 else
   {
-  nRepNext = 0;                         /* reset eventual repeat if no code  */
+  nRepNext = 0;                         /* reset possible repeat if no code  */
   setlabel(lp);
+  c = *srcptr;                          /* now look where we are at ...      */
+  if (((dwOptions & OPTION_TSC) && (c == '*')) ||
+      ((dwOptions & OPTION_GAS) && (c == '|')) ||
+      (c == ';'))
+    c = '\0';
+  if (c)                                /* if NOT empty or comment,          */
+    error |= ERR_EXPR;                  /* mark as invalid expression        */
   }
 
 if (inMacro)                            /* if in macro definition            */
