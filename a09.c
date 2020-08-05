@@ -241,6 +241,7 @@
                    https://github.com/Arakula/A09/pull/2
    v1.40  20/03/01 Program Counter Relative addressing didn't work correctly
                    as reported by M. Richemont - thank you!
+   v1.41  20/07/08 Improved syntax checking
 
 */
 
@@ -271,8 +272,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.40"
-#define VERSNUM      "$0128"            /* can be queried as &VERSION        */
+#define VERSION      "1.41"
+#define VERSNUM      "$0129"            /* can be queried as &VERSION        */
 
 #define MAXLABELS    8192
 #define MAXMACROS    1024
@@ -6589,7 +6590,7 @@ else
   nRepNext = 0;                         /* reset possible repeat if no code  */
   setlabel(lp);
   c = *srcptr;                          /* now look where we are at ...      */
-  if (((dwOptions & OPTION_TSC) && (c == '*')) ||
+  if ((c == '*') ||
       ((dwOptions & OPTION_GAS) && (c == '|')) ||
       (c == ';'))
     c = '\0';
