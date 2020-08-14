@@ -108,140 +108,151 @@
     * denotes default value
 
     
-   v0.1 93/11/03 Initial version.
+   v0.1   1993-11-03 Initial version.
     
-   v0.2 94/03/21 Fixed PC relative addressing bug
-                 Added SET, SETDP, INCLUDE. IF/ELSE/ENDIF
-                 No macros yet, and no separate linkable modules.
+   v0.2   1994-03-21 Fixed PC relative addressing bug
+                     Added SET, SETDP, INCLUDE. IF/ELSE/ENDIF
+                     No macros yet, and no separate linkable modules.
 
-   v0.1.X 99/12/20 added Intel hex option (SLB)
+   v0.1.X 1999-12-20 added Intel hex option (SLB)
 
 -- H.Seib Additions: --
 
-   v0.2.S 01/10/13 converted to readable format
-   v0.3   01/10/15 added transfer address processing
-                   increased max. #symbols and other constants
-                     (hey, this isn't CP/M anymore :-)
-                   added a bit of intelligence to command line processing
-                   loads file(s) into internal storage prior to processing
-                     (this aids a lot in preventing recursive invocations)
-                   added LIB,LIBRARY pseudoop (same as INCLUDE)
-                   added OPT,OPTION pseudoop
-   v0.4   01/10/22 added -t switch to increase compatibility with the
-                   TSC FLEX Assembler line, which uses a slightly more
-                   rigid source file format
-   v0.5   01/10/23 added SETPG, SETLI, PAG, SPC, NAM(TTL,TITLE), STTL, REP(RPT,REPEAT)
-   v0.6   01/10/23 added EXITM, IFN, IFC, IFNC, DUP, ENDD
-   v0.7   01/10/29 added REG, ERR, TEXT
-   v0.8   01/10/30 converted command line handling to -O switch for options
-                   and added a bunch of options
-                   RZB pseudoop added
-   v0.9   01/11/05 clean-ups, increased TSC FLEX Assembler compatibility
-   v0.10  01/11/15 ASM and VERSION texts predefined
-   v0.11  01/11/27 increased TSC FLEX Assembler compatibility (labels made case sensitive)
-   v0.12  01/11/28 added some convenience mnemonics and simulated 6800 instructions to
-                   increase TSC FLEX Assembler compatibility
-   v1.02  01/04/11 check for address range overlaps implemented
-   v1.03  02/09/24 macro parser had an error; corrected
-   v1.04  02/12/10 error message output adjusted for Visual C++ 6.0 IDE compatibility
-                   added OPT LFN/NLF for that purpose
-   v1.05  02/12/23 crude form of backwards ORG added to binary output
-   v1.06  03/06/10 added OPT LLL/NLL to include/suppress listing of LIB lines
-   v1.07  03/06/23 outsymtable() only starts with a page feed if current line
-                   is is NOT the first line on a page
-   v1.08  03/07/01 SKIP count for the IF(N) and IF(N)C statements added to
-                   normal statements (i.e., outside macro definitions)
-   v1.09  05/06/02 some cleanups
-                   added -r format for FLEX9 RELASMB compatible output
-                   added ABS, GLOBAL, EXT, DEFINE, ENDDEF, COMMON, ENDCOM
-                   REL|NOR option added
-                   GAS|NOG option added (rudimentary)
-                   M68|H63 option added
-   v1.10  05/06/03 made options available as numeric strings
-                   added local label support
-                   added SYMLEN
-                   TXT|NTX option added
-   v1.11  05/06/06 IFD/IFND directives added
-                   added special checks for "0,-[-]indexreg" and "0,indexreg+[+]"
-                   when determining the postbyte for indexed addressing modes
-   v1.12  05/06/20 OPT CON|NOC correctly implemented
-   v1.13           skipped for users that might have an uneasy feeling about
-                   the number "13" >:-)
-   v1.14  05/08/01 text symbol replacement enhanced; it was a bit TOO general.
-                   Now, &xxx is only treated as a text variable when xxx REALLY
-                   is a text symbol; in all other cases, it's not preprocessed.
-                   Let the assembler engine handle eventual errors.
-                   Thanks to Peter from Australia for pointing this out!
-   v1.15  05/08/02 only 1 local label was allowed per address; now, as many as
-                   possible can be at the same location.
-                   Thanks to Peter from Australia for pointing this out!
-   v1.16  05/08/05 SETDP is illegal in relocating mode!
-                   SETDP without any parameter DISABLES Direct mode entirely.
-                   Cured an interesting bug... the following sequence:
-                              ORG 1
-                              LDA TEST
-                       SHIT   NOP
-                              ORG 1
-                       TEST   RMB 1
-                   caused a phase error; this was caused by the invalid
-                   assumption in scanlabel() that forward references have
-                   a higher memory location than the current address.
-                   Thanks to Peter from Australia for pointing this out!
-   v1.17  05/08/08 made tests for above problem more rigorous; now ANY forward
-                   reference to a label that's not yet defined is treated as
-                   uncertain.
-                   Removed a nasty bug that caused the following code to produce
-                   incorrect values:
-                            org $8000  (anything >= $8000 will do)
-                         lbl rmb 8
-                         SizeBad equ (*-lbl)/2
-                   OPT NOL changed to OPT NO1 to allow implementing OPT LIS|NOL.
-                   OPT LIS*|NOL added
-                   Thanks to Peter from Australia for pointing these out!
-   v1.18  05/08/09 backward search for local labels now searches for "<= local
-                   address" instead of "< local address"
-                   Thanks to Peter from Australia for pointing this out!
-                   Added INCD / DECD convenience mnemonics
-                   (realized as ADDD/SUBD 1)
-   v1.19  05/08/10 Added a bunch of 6800-style mnemonics; if they conflict
-                   with 6809 mnemonics ("INC A" for example), they are only
-                   active in TSC mode
-   v1.20  05/08/16 changed special checks for
+   v0.2.S 2001-10-13 converted to readable format
+   v0.3   2001-10-15 added transfer address processing
+                     increased max. #symbols and other constants
+                       (hey, this isn't CP/M anymore :-)
+                     added a bit of intelligence to command line processing
+                     loads file(s) into internal storage prior to processing
+                       (this aids a lot in preventing recursive invocations)
+                     added LIB,LIBRARY pseudoop (same as INCLUDE)
+                     added OPT,OPTION pseudoop
+   v0.4   2001-10-22 added -t switch to increase compatibility with the
+                     TSC FLEX Assembler line, which uses a slightly more
+                     rigid source file format
+   v0.5   2001-10-23 added SETPG, SETLI, PAG, SPC, NAM(TTL,TITLE), STTL, REP(RPT,REPEAT)
+   v0.6   2001-10-23 added EXITM, IFN, IFC, IFNC, DUP, ENDD
+   v0.7   2001-10-29 added REG, ERR, TEXT
+   v0.8   2001-10-30 converted command line handling to -O switch for options
+                     and added a bunch of options
+                     RZB pseudoop added
+   v0.9   2001-11-05 clean-ups, increased TSC FLEX Assembler compatibility
+   v0.10  2001-11-15 ASM and VERSION texts predefined
+   v0.11  2001-11-27 increased TSC FLEX Assembler compatibility (labels made case sensitive)
+   v0.12  2001-11-28 added some convenience mnemonics and simulated 6800 instructions to
+                     increase TSC FLEX Assembler compatibility
+   v1.02  2001-04-11 check for address range overlaps implemented
+   v1.03  2002-09-24 macro parser had an error; corrected
+   v1.04  2002-12-10 error message output adjusted for Visual C++ 6.0 IDE compatibility
+                     added OPT LFN/NLF for that purpose
+   v1.05  2002-12-23 crude form of backwards ORG added to binary output
+   v1.06  2003-06-10 added OPT LLL/NLL to include/suppress listing of LIB lines
+   v1.07  2003-06-23 outsymtable() only starts with a page feed if current line
+                     is is NOT the first line on a page
+   v1.08  2003-07-01 SKIP count for the IF(N) and IF(N)C statements added to
+                     normal statements (i.e., outside macro definitions)
+   v1.09  2005-06-02 some cleanups
+                     added -r format for FLEX9 RELASMB compatible output
+                     added ABS, GLOBAL, EXT, DEFINE, ENDDEF, COMMON, ENDCOM
+                     REL|NOR option added
+                     GAS|NOG option added (rudimentary)
+                     M68|H63 option added
+   v1.10  2005-06-03 made options available as numeric strings
+                     added local label support
+                     added SYMLEN
+                     TXT|NTX option added
+   v1.11  2005-06-06 IFD/IFND directives added
+                     added special checks for "0,-[-]indexreg" and "0,indexreg+[+]"
+                     when determining the postbyte for indexed addressing modes
+   v1.12  2005-06-20 OPT CON|NOC correctly implemented
+   v1.13             skipped for users that might have an uneasy feeling about
+                     the number "13" >:-)
+   v1.14  2005-08-01 text symbol replacement enhanced; it was a bit TOO general.
+                     Now, &xxx is only treated as a text variable when xxx REALLY
+                     is a text symbol; in all other cases, it's not preprocessed.
+                     Let the assembler engine handle eventual errors.
+                     Thanks to Peter from Australia for pointing this out!
+   v1.15  2005-08-02 only 1 local label was allowed per address; now, as many as
+                     possible can be at the same location.
+                     Thanks to Peter from Australia for pointing this out!
+   v1.16  2005-08-05 SETDP is illegal in relocating mode!
+                     SETDP without any parameter DISABLES Direct mode entirely.
+                     Cured an interesting bug... the following sequence:
+                                ORG 1
+                                LDA TEST
+                         SHIT   NOP
+                                ORG 1
+                         TEST   RMB 1
+                     caused a phase error; this was caused by the invalid
+                     assumption in scanlabel() that forward references have
+                     a higher memory location than the current address.
+                     Thanks to Peter from Australia for pointing this out!
+   v1.17  2005-08-08 made tests for above problem more rigorous; now ANY forward
+                     reference to a label that's not yet defined is treated as
+                     uncertain.
+                     Removed a nasty bug that caused the following code to produce
+                     incorrect values:
+                              org $8000  (anything >= $8000 will do)
+                           lbl rmb 8
+                           SizeBad equ (*-lbl)/2
+                     OPT NOL changed to OPT NO1 to allow implementing OPT LIS|NOL.
+                     OPT LIS*|NOL added
+                     Thanks to Peter from Australia for pointing these out!
+   v1.18  2005-08-09 backward search for local labels now searches for "<= local
+                     address" instead of "< local address"
+                     Thanks to Peter from Australia for pointing this out!
+                     Added INCD / DECD convenience mnemonics
+                     (realized as ADDD/SUBD 1)
+   v1.19  2005-08-10 Added a bunch of 6800-style mnemonics; if they conflict
+                     with 6809 mnemonics ("INC A" for example), they are only
+                     active in TSC mode
+   v1.20  2005-08-16 changed special checks for
+                       "0,-[-]indexreg" and "0,indexreg+[+]"
+                     to include all known labels and changed the scope to
+                       ",[-[-]]indexreg[+[+]]"
+   v1.21  2006-02-21 Bug in "xxx  >0,reg" found by Margus Kliimask
+   v1.22  2008-09-03 Addded BIN(ARY) pseudo-op to include binary files
+   v1.23  2009-02-13 6800 code generation added
+                     accept multiple input files (first one defines default
+                       output and listing file names)
+   v1.24  2009-02-13 made compilable with gcc
+   v1.25  2009-03-05 6800 alternate mnemonics work better now
+   v1.26  2009-03-14 assembling DOS format files in Loonix works better now
+   v1.27  2010-01-20 LPA/NLP options added
+   v1.28  2010-04-21 INCD/DECD produced invalid code
+   v1.29  2015-06-19 M01/M02/M03/M08 options added
+   v1.30  2015-06-22 PHASE/DEPHASE pseudo-ops added
+   v1.31  2015-07-15 6301/6303 support added
+   v1.32  2015-08-19 FCQ/FQB pseudo-ops added
+   v1.33  2015-08-28 Macro problems (found by Bob Grieb) fixed
+   v1.34  2015-09-09 More macro problems (found by Bob Grieb) fixed
+   v1.35  2015-09-11 Corrected an oversight in the special checks for
                      "0,-[-]indexreg" and "0,indexreg+[+]"
-                   to include all known labels and changed the scope to
-                     ",[-[-]]indexreg[+[+]]"
-   v1.21  06/02/21 Bug in "xxx  >0,reg" found by Margus Kliimask
-   v1.22  08/09/03 Addded BIN(ARY) pseudo-op to include binary files
-   v1.23  09/02/13 6800 code generation added
-                   accept multiple input files (first one defines default
-                     output and listing file names)
-   v1.24  09/02/13 made compilable with gcc
-   v1.25  09/03/05 6800 alternate mnemonics work better now
-   v1.26  09/03/14 assembling DOS format files in Loonix works better now
-   v1.27  10/01/20 LPA/NLP options added
-   v1.28  10/04/21 INCD/DECD produced invalid code
-   v1.29  15/06/19 M01/M02/M03/M08 options added
-   v1.30  15/06/22 PHASE/DEPHASE pseudo-ops added
-   v1.31  15/07/15 6301/6303 support added
-   v1.32  15/08/19 FCQ/FQB pseudo-ops added
-   v1.33  15/08/28 Macro problems (found by Bob Grieb) fixed
-   v1.34  15/09/09 More macro problems (found by Bob Grieb) fixed
-   v1.35  15/09/11 Corrected an oversight in the special checks for
-                   "0,-[-]indexreg" and "0,indexreg+[+]"
-   v1.36  15/09/25 BSZ,ZMB pseudo-ops added (AS9-compatible alternatives
-                     to RZB)
-                   FILL <value>,<byte_count> psudo-op added
-   v1.37  16/06/16 DLM|NDL* options added; see
-                     https://github.com/Arakula/A09/issues/1
-                   for details.
-   v1.38  18/12/06 corrected 6801/6301 errors in JSR/STD processing
-                   as reported by M. Hepperle - thank you!
-   v1.39  19/02/28 Improved gcc / clang compatibility,
-                   based on Steve Byan's pull request here:
-                   https://github.com/Arakula/A09/pull/2
-   v1.40  20/03/01 Program Counter Relative addressing didn't work correctly
-                   as reported by M. Richemont - thank you!
-   v1.41  20/07/08 Improved syntax checking
+   v1.36  2015-09-25 BSZ,ZMB pseudo-ops added (AS9-compatible alternatives
+                       to RZB)
+                     FILL <value>,<byte_count> pseudo-op added
+   v1.37  2016-06-16 DLM|NDL* options added; see
+                       https://github.com/Arakula/A09/issues/1
+                     for details.
+   v1.38  2018-12-06 corrected 6801/6301 errors in JSR/STD processing
+                     as reported by M. Hepperle - thank you!
+   v1.39  2019-02-28 Improved gcc / clang compatibility,
+                     based on Steve Byan's pull request here:
+                     https://github.com/Arakula/A09/pull/2
+   v1.40  2020-03-01 Program Counter Relative addressing didn't work correctly
+                     as reported by M. Richemont - thank you!
+   v1.41  2020-07-08 Improved syntax checking
+   v1.42  2020-08-10 added "-dFILCHR=fillchar" constant to set up a fill
+                       character other than \0 for RMB and ORG fillers in
+                       binary output; in source files, this can be written as
+                         "FILCHR TEXT $FF"
+                       for example. See
+                         https://github.com/Arakula/A09/issues/6
+                       for details.
+                     Regression: TSC-format local labels didn't work. Thanks to
+                       Ray Bellis for pointing that out. See
+                         https://github.com/Arakula/A09/issues/7
+                       for details.
 
 */
 
@@ -272,8 +283,9 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.41"
-#define VERSNUM      "$0129"            /* can be queried as &VERSION        */
+#define VERSION      "1.42"
+#define VERSNUM      "$012A"            /* can be queried as &VERSION        */
+#define RMBDEFCHR    "$00"
 
 #define MAXLABELS    8192
 #define MAXMACROS    1024
@@ -1668,6 +1680,7 @@ char relocatable = 0;                   /* relocatable object flag           */
 char absmode = 1;                       /* absolute mode                     */
 long global = 0;                        /* all labels global flag            */
 long common = 0;                        /* common definition flag            */
+char rmbfillchr = 0;                    /* RMB fill character for binaries   */
 struct symrecord * commonsym = NULL;    /* current common main symbol        */
 char terminate;                         /* termination flag                  */
 char generating;                        /* code generation flag              */
@@ -2150,6 +2163,220 @@ return NULL;
 }
 
 /*****************************************************************************/
+/* isValidNameChar : returns whether char is a valid name char               */
+/*****************************************************************************/
+
+char isValidNameChar(char c, char cFirst)
+{
+if (cFirst)                             /* first char of a name is special   */
+  {
+  if ((c >= 'A' && c <= 'Z') ||         /* A..Z is always valid              */
+      (c >= 'a' && c <= 'z') ||
+      (c >= '0' && c <= '9'))           /* local labels start numeric        */
+    return 1;
+  if ((cFirst == 1) &&                  /* if explicitly checking for labels */
+      (dwOptions & OPTION_TSC))         /* only letters and numbers in TSC   */
+    return 0;                           /* in 1st position                   */
+  if (c == '.' || c == '_')             /* others allow . and _ as start char*/
+    return 1;
+  if ((dwOptions & OPTION_GAS) &&       /* Gnu as allows $, too              */
+      (c == '$'))
+    return 1;
+  if (cFirst == 1)                      /* if explicitly checking for labels */
+    return 0;                           /* anything else is invalid          */
+  }
+
+if ((c >= '0' && c <= '9') ||           /* normally, labels may consist of   */
+    (c >= 'A' && c <= 'Z') ||           /* the characters 0..9,A..Z,a..z,_   */
+    (c >= 'a' && c <= 'z') ||
+    (c == '_'))
+  return 1;
+if ((dwOptions & OPTION_GAS) &&         /* Gnu as also allows $              */
+    (c == '$'))
+  return 1;
+if (!(dwOptions & OPTION_TSC) &&        /* non-TSC and non-GNU allows more:  */
+    (c == '.' ||                        /* . $ _ are allowed in names, too   */
+     c == '_' ||
+     c == '$'))
+  return 1;
+
+return 0;
+}
+
+/*****************************************************************************/
+/* parsename : parses a name from a text string                              */
+/*****************************************************************************/
+
+void parsename(char *srcptr, char **nextptr)
+{
+int i = 0;
+char c, cValid, cFirst = 2;
+
+while (1)
+  {
+  c = *srcptr++;
+  if ((!(dwOptions & OPTION_TSC)) &&    /* TSC Assembler is case-sensitive   */
+      (!(dwOptions & OPTION_GAS)) &&    /* GNU Assembler is case-sensitive   */
+      (c >= 'a' && c <= 'z'))
+    c -= ('a' - 'A');
+  cValid = isValidNameChar(c, cFirst);  /* check for validity                */
+  if (!cValid)                          /* if invalid character encountered  */
+    break;                              /* stop here                         */
+
+  if (i < maxidlen)
+    {
+    namebuf[i] = c;
+    unamebuf[i] = toupper(c);
+    i++;
+    }
+  cFirst = 0;
+  }
+namebuf[i] = '\0';
+unamebuf[i] = '\0';
+if (nextptr)
+  *nextptr = --srcptr;
+}
+
+/*****************************************************************************/
+/* parsedecimal : parses a decimal number                                    */
+/*****************************************************************************/
+
+long parsedecimal(char *srcptr, char **nextptr)
+{
+char c = *srcptr++;
+long t = 0;
+while (isdigit(c))
+  {
+  t = t * 10 + c - '0';
+  c = *srcptr++;
+  }
+if (nextptr)
+  *nextptr = --srcptr;
+return t;
+} 
+
+/*****************************************************************************/
+/* parsehex : parses a hex number                                            */
+/*****************************************************************************/
+
+long parsehex(char *srcptr, char **nextptr)
+{
+long t = 0, i = 0;
+
+parsename(++srcptr, &srcptr);           /* parse skipping leading $          */
+while (unamebuf[i] >= '0' && unamebuf[i] <= 'F')
+  {
+  t = t * 16 + unamebuf[i] - '0';
+  if (unamebuf[i] > '9')
+    t -= 7;
+  i++;
+  }  
+if (i == 0)
+  error |= ERR_EXPR;
+if (nextptr)
+  *nextptr = srcptr;
+return t;
+}
+
+/*****************************************************************************/
+/* parsechar : parses a character                                            */
+/*****************************************************************************/
+
+long parsechar(char *srcptr, char **nextptr)
+{
+long t = *++srcptr;                     /* get char skipping '               */
+if (nextptr && t)
+  {
+  srcptr++;
+  if (*srcptr == '\'')
+    srcptr++;
+  *nextptr = srcptr;
+  }
+return t;
+}
+
+/*****************************************************************************/
+/* parsebin : parses a binary value                                          */
+/*****************************************************************************/
+
+long parsebin(char *srcptr, char **nextptr)
+{
+char c;
+short t = 0;
+
+srcptr++;                               /* skip %                            */
+c = *srcptr++;
+while (c == '0' || c == '1')
+  {
+  t = t * 2 + c - '0';
+  c = *srcptr++;
+  }
+if (nextptr)
+  *nextptr = --srcptr;
+return t;
+}
+
+/*****************************************************************************/
+/* parseoct : parses an octal value                                          */
+/*****************************************************************************/
+
+long parseoct(char *srcptr, char **nextptr)
+{
+char c;
+long t = 0;
+
+srcptr++;                               /* skip @                            */
+c = *srcptr++;
+while (c >= '0' && c <= '7')
+  {
+  t = t * 8 + c - '0';
+  c = *srcptr++;
+  }
+if (nextptr)
+  *nextptr = --srcptr;
+return t;
+}
+
+/*****************************************************************************/
+/* parsestring : parses a string into a buffer                               */
+/*****************************************************************************/
+
+char * parsestring(char *srcptr, char *dest, int nlen, char **nextptr)
+{
+char *s = srcptr;
+char *d = dest;
+int nInString = 0;
+char c;
+
+if (*srcptr == '\'' || *srcptr == '\"')
+  {
+  nInString = 1;
+  srcptr++;
+  }
+
+while (*srcptr)
+  {
+  if (!nInString &&
+      (*srcptr == ' ' || *srcptr == ','))
+    break;
+  else if (nInString && *s == *srcptr)
+    {
+    srcptr++;
+    break;
+    }
+  c = *srcptr++;
+  if (!nInString && c >= 'a' && c <= 'z')
+    c -= 32;
+  *d++ = c;
+  }
+*d = '\0';
+
+if (nextptr)
+  *nextptr = srcptr;
+return dest;
+}
+
+/*****************************************************************************/
 /* settext : sets a text symbol                                              */
 /*****************************************************************************/
 
@@ -2207,6 +2434,28 @@ if (texts[lp->value])
   strcpy(texts[lp->value] + special, text);
   if (special)
     strcat(texts[lp->value], "\"");
+  }
+
+if (!strcmp(namebuf, "FILCHR"))         /* special for FILCHR : set internal */
+  {                                     /* byte                              */
+  switch (text[0])
+    {
+    case '$' :
+      rmbfillchr = (char)parsehex(text, NULL);
+      break;
+    case '%' :
+      rmbfillchr = (char)parsebin(text, NULL);
+      break;
+    case '@' :
+      rmbfillchr = (char)parseoct(text, NULL);
+      break;
+    case '\'' :
+      rmbfillchr = (char)parsechar(text, NULL);
+      break;
+    default :
+      error |= ERR_EXPR;
+      break;
+    }
   }
 
 return lp->value;
@@ -2440,90 +2689,28 @@ switch (p->sym->cat)                    /* do specials...                    */
 }
 
 /*****************************************************************************/
-/* isValidNameChar : returns whether char is a valid name char               */
-/*****************************************************************************/
-
-char isValidNameChar(char c, char cFirst)
-{
-if (cFirst)                             /* first char of a name is special   */
-  {
-  if ((c >= 'A' && c <= 'Z') ||         /* A..Z is always valid              */
-      (c >= 'a' && c <= 'z'))
-    return 1;
-  if ((cFirst == 1) &&                  /* if explicitly checking for labels */
-      (dwOptions & OPTION_TSC))         /* TSC Assembler allows ONLY letters */
-    return 0;                           /* in 1st position                   */
-  if (c == '.' || c == '_')             /* others allow . and _ as start char*/
-    return 1;
-  if ((dwOptions & OPTION_GAS) &&       /* Gnu as allows $, too              */
-      (c == '$'))
-    return 1;
-  if (cFirst == 1)                      /* if explicitly checking for labels */
-    return 0;                           /* anything else is invalid          */
-  }
-
-if ((c >= '0' && c <= '9') ||           /* normally, labels may consist of   */
-    (c >= 'A' && c <= 'Z') ||           /* the characters A..Z,a..z,_        */
-    (c >= 'a' && c <= 'z') ||
-    (c == '_'))
-  return 1;
-if ((dwOptions & OPTION_GAS) &&         /* Gnu as also allows $              */
-    (c == '$'))
-  return 1;
-if (!(dwOptions & OPTION_TSC) &&        /* non-TSC and non-GNU allows more:  */
-    (c == '.' ||                        /* . $ _ are allowed in names, too   */
-     c == '_' ||
-     c == '$'))
-  return 1;
-
-
-return 0;
-}
-
-/*****************************************************************************/
 /* scanname : scans a name from the input buffer                             */
 /*****************************************************************************/
 
 void scanname()
 {
-int i = 0;
-char c;
-char cValid;
-char cFirst = 2;
-
-while (1)
-  {
-  c = *srcptr++;
-  if ((!(dwOptions & OPTION_TSC)) &&    /* TSC Assembler is case-sensitive   */
-      (!(dwOptions & OPTION_GAS)) &&    /* GNU Assembler is case-sensitive   */
-      (c >= 'a' && c <= 'z'))
-    c -= ('a' - 'A');
-  cValid = isValidNameChar(c, cFirst);  /* check for validity                */
-  if (!cValid)                          /* if invalid character encountered  */
-    break;                              /* stop here                         */
-
-  if (i < maxidlen)
-    {
-    namebuf[i] = c;
-    unamebuf[i] = toupper(c);
-    i++;
-    }
-  cFirst = 0;
-  }
-namebuf[i] = '\0';
-unamebuf[i] = '\0';
-srcptr--;
+parsename(srcptr, &srcptr);             /* parse with global pointer         */
 }
 
 /*****************************************************************************/
 /* skipspace : skips whitespace characters                                   */
 /*****************************************************************************/
 
-void skipspace()
+char skipspace()
 {
-char c;
+char c, lblk = 0;
 while ((c = *srcptr) == ' ' || c == '\t')
+  {
+  if (lblk < 127)
+    lblk++;
   srcptr++;
+  }
+return lblk; /* return whether (and approx. how many) leading blanks skipped */
 } 
 
 /*****************************************************************************/
@@ -2532,16 +2719,7 @@ while ((c = *srcptr) == ' ' || c == '\t')
 
 long scandecimal()
 {
-char c;
-long t = 0;
-c = *srcptr++;
-while (isdigit(c))
-  {
-  t = t * 10 + c - '0';
-  c = *srcptr++;
-  }
-srcptr--;
-return t;
+return parsedecimal(srcptr, &srcptr);   /* parse using global pointer        */
 } 
 
 /*****************************************************************************/
@@ -2550,20 +2728,7 @@ return t;
 
 long scanhex()
 {
-long t = 0, i = 0;
-
-srcptr++;
-scanname();
-while (unamebuf[i] >= '0' && unamebuf[i] <= 'F')
-  {
-  t = t * 16 + unamebuf[i] - '0';
-  if (unamebuf[i] > '9')
-    t -= 7;
-  i++;
-  }  
-if (i==0)
-  error |= ERR_EXPR;
-return t;
+return parsehex(srcptr, &srcptr);       /* parse using global pointer        */
 }
 
 /*****************************************************************************/
@@ -2572,15 +2737,7 @@ return t;
 
 long scanchar()
 {
-long  t;
-
-srcptr++;
-t = *srcptr;
-if (t)
-  srcptr++;
-if (*srcptr == '\'')
-  srcptr++;
-return t;
+return parsechar(srcptr, &srcptr);      /* parse using global pointer        */
 }
 
 /*****************************************************************************/
@@ -2589,18 +2746,7 @@ return t;
 
 long scanbin()
 {
-char c;
-short t = 0;
-
-srcptr++;
-c = *srcptr++;
-while (c == '0' || c == '1')
-  {
-  t = t * 2 + c - '0';
-  c = *srcptr++;
-  }
-srcptr--;
-return t;
+return parsebin(srcptr, &srcptr);       /* parse using global pointer        */
 }
 
 /*****************************************************************************/
@@ -2609,18 +2755,7 @@ return t;
 
 long scanoct()
 {
-char c;
-long t = 0;
-
-srcptr++;
-c = *srcptr++;
-while (c >= '0' && c <= '7')
-  {
-  t = t * 8 + c - '0';
-  c = *srcptr++;
-  }
-srcptr--;
-return t;
+return parseoct(srcptr, &srcptr);       /* parse using global pointer        */
 }
 
 /*****************************************************************************/
@@ -2628,36 +2763,8 @@ return t;
 /*****************************************************************************/
 
 char * scanstring(char *dest, int nlen)
-{
-char *s = srcptr;
-char *d = dest;
-int nInString = 0;
-char c;
-
-if (*srcptr == '\'' || *srcptr == '\"')
-  {
-  nInString = 1;
-  srcptr++;
-  }
-
-while (*srcptr)
-  {
-  if (!nInString &&
-      (*srcptr == ' ' || *srcptr == ','))
-    break;
-  else if (nInString && *s == *srcptr)
-    {
-    srcptr++;
-    break;
-    }
-  c = *srcptr++;
-  if (!nInString && c >= 'a' && c <= 'z')
-    c -= 32;
-  *d++ = c;
-  }
-*d = '\0';
-
-return dest;
+{                                       /* parse using global pointer        */
+return parsestring(srcptr, dest, nlen, &srcptr);
 }
 
 
@@ -2756,7 +2863,8 @@ long t;
 if (!(dwOptions & OPTION_TSC))
   skipspace();
 c = *srcptr;
-if (isValidNameChar(c, 1))
+if (isValidNameChar(c, 1) &&
+    !isdigit(c))                        /* digit is either constant or loclbl*/
   return (unsigned short)scanlabel(p);
 else if (isdigit(c))
   {
@@ -5314,7 +5422,7 @@ switch (co)
     break;
   case PSEUDO_RMB :                     /* [label] RMB <absolute expression> */
   case PSEUDO_RZB :                     /* [label] RZB <absolute expression> */
-    fillc = 0;
+    fillc = (co == PSEUDO_RZB) ? 0 : rmbfillchr;
   DoFill:
     operand = scanexpr(0, &p);
     if (unknown)
@@ -5656,9 +5764,17 @@ switch (co)
         case OUT_BIN :                  /* binary output file                */
           j = (int)(unsigned short)operand - (int)loccounter;
           if (j > 0)                    /* if forward gap                    */
-            {
+            {                           /* get current pos and file end      */
+            long pos = ftell(objfile);
+            long avbytes = fseek(objfile, 0, SEEK_END) - pos;
+            fseek(objfile, pos, SEEK_SET);
             for (i = 0; i < j; i++)     /* seek forward that many bytes      */
-              fseek(objfile, 1, SEEK_CUR);
+              {
+              if (i < avbytes)
+                fseek(objfile, 1, SEEK_CUR);
+              else
+                fputc(rmbfillchr, objfile);
+              }
             }
           else                          /* if backward gap                   */
             {
@@ -6939,6 +7055,7 @@ struct linebuf *pLastLine = NULL;
 settext("ASM", "A09");                  /* initialize predefined texts       */
 settext("VERSION", VERSNUM);
 settext("PASS", "1");
+settext("FILCHR", RMBDEFCHR);
 setoptiontexts();
 nPredefinedTexts = nTexts;
 
