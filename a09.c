@@ -253,6 +253,10 @@
                        Ray Bellis for pointing that out. See
                          https://github.com/Arakula/A09/issues/7
                        for details.
+   v1.43  2020-08-27 Nested macros didn't work correctly; thanks to
+                       Ray Bellis for pointing that out. See
+                         https://github.com/Arakula/A09/issues/8
+                       for details.
 
 */
 
@@ -283,10 +287,11 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.42"
-#define VERSNUM      "$012A"            /* can be queried as &VERSION        */
+#define VERSION      "1.43"
+#define VERSNUM      "$012B"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
+#define MAXFILES     128
 #define MAXLABELS    8192
 #define MAXMACROS    1024
 #define MAXTEXTS     1024
@@ -311,7 +316,7 @@ struct linebuf
   char txt[1];                          /* text buffer                       */
   };
 
-char *fnms[128] = {0};                  /* we process up to 128 different fls*/
+char *fnms[MAXFILES] = {0};             /* process up to N different files   */
 short nfnms;                            /* # loaded files                    */
 
                                         /* special bits in lvl :             */
@@ -1770,6 +1775,7 @@ char szBuf2[LINELEN];
 struct linebuf *macros[MAXMACROS];      /* pointers to the macros            */
 int nMacros = 0;                        /* # parsed macros                   */
 int inMacro = 0;                        /* flag whether in macro definition  */
+int lvlMacro = 0;                       /* current macro expansion level     */
 
 char *texts[MAXTEXTS];                  /* pointers to the texts             */
 int nPredefinedTexts = 0;               /* # predefined texts                */
@@ -1781,7 +1787,6 @@ unsigned char bUsedBytes[8192] = {0};   /* 1 bit per byte of the address spc */
 /* Necessary forward declarations                                            */
 /*****************************************************************************/
 
-void processline();
 struct linebuf *readfile(char *name, unsigned char lvl, struct linebuf *after);
 struct linebuf *readbinary(char *name, unsigned char lvl, struct linebuf *after, struct symrecord *lp);
 
@@ -4122,6 +4127,8 @@ else if (LINE_IS_MACDEF(curline->lvl))  /* if in macro definition            */
   putlist("#");                         /* prefix line with #                */
 else if (LINE_IS_MACEXP(curline->lvl))  /* if in macro expansion             */
   putlist("+");                         /* prefix line with +                */
+else if (LINE_IS_MACINV(curline->lvl))  /* if in macro invocation            */
+  putlist("&");                         /* prefix line with &                */
 else if (LINE_IS_INVISIBLE(curline->lvl))
   putlist("-");
 else if (*curline->txt)                 /* otherwise                         */
@@ -6053,15 +6060,26 @@ switch (co)
       error |= ERR_NESTING;
     break;
   case PSEUDO_ENDM :                    /* ENDM                              */
-    if (!inMacro)
-      error |= ERR_EXPR;
-    else
+    if (inMacro)
       inMacro--;
+    else
+      {
+      if (lvlMacro)
+        lvlMacro--;
+      if (!(curline->lvl & LINCAT_MACEXP))
+        error |= ERR_EXPR;
+      }
     break;
   case PSEUDO_EXITM :                   /* EXITM                             */
-    if (!inMacro &&                     /* only allowed inside macros        */
-         !(curline->lvl & LINCAT_MACEXP))
-      error |= ERR_EXPR;
+    if (inMacro)
+      ;
+    else
+      {
+      if (lvlMacro)
+        lvlMacro--;
+      if (!(curline->lvl & LINCAT_MACEXP))
+        error |= ERR_EXPR;
+      }
     break;
   case PSEUDO_REG :                     /* label REG <register list>         */
     if (!lp)                            /* label is mandatory!               */
@@ -6233,14 +6251,17 @@ int terminate = 0;                      /* terminate macro expansion if set  */
 int skipit = 0;                         /* skip this line                    */
 int suppress[64] = {0};                 /* internal suppression (max.64 lvl) */
 int ifcount = 0;                        /* internal if counter               */
+int curlvl = curline->lvl & LINCAT_LVLMASK;
 struct relocrecord p = {0};
 
+#if 0
 if ((listing & LIST_ON) &&              /* if listing pass 1                 */
     (dwOptions & OPTION_LIS) &&
     (dwOptions & OPTION_LP1) &&
     (dwOptions & OPTION_MAC))
   outlist(NULL);                        /* show macro invocation BEFORE      */
                                         /* processing the expansions         */
+#endif
 
 skipspace();                            /* skip spaces before macro args     */
 
@@ -6255,42 +6276,61 @@ nMacParms = 1;                          /* reset # parsed parms to 1         */
 
 strcpy(szMacInv, srcptr);               /* copy the current line for mangling*/
 srcptr = szMacInv;                      /* set pointer to internal buffer    */
-do
+
+while (*srcptr)                         /* while there are parameters        */
   {
-  while (*srcptr == ',')                /* skip parameter delimiter(s)       */
+  szMacParm[nMacParms] = srcptr;        /* store parameter start pointer     */
+
+  if (*srcptr == ',')                   /* if parameter delimiter            */
     {
     *srcptr++ = '\0';                   /* delimit & advance behind it       */
     if (!(dwOptions & OPTION_TSC))
       skipspace();
-    }
-                                        /* OK, next string...                */
-  if ((*srcptr == '\'') ||              /* if delimited string               */
-      (*srcptr == '\"'))
-    nInString = 1;                      /* remember we're in delimited strg  */
-  szMacParm[nMacParms] = srcptr++;      /* store parameter start pointer     */
-  while (*srcptr)                       /* walk to end of parameter          */
-    {
-    if (!nInString &&
-        ((*srcptr == ' ') || (*srcptr == ',')))
+    if (++nMacParms >= 10)
       break;
-    else if (nInString &&
-             *srcptr == *szMacParm[nMacParms])
+    }
+  else                                  /* otherwise walk thru parameter     */
+    {
+    if ((*srcptr == '\'') ||            /* if delimited string               */
+        (*srcptr == '\"'))
       {
+      nInString = 1;                    /* remember we're in delimited strg  */
       srcptr++;
-      break;
       }
-    srcptr++;
+    while (*srcptr)                     /* walk to end of parameter          */
+      {
+      if (!nInString &&
+          ((*srcptr == ' ') || (*srcptr == ',')))
+        break;
+      else if (nInString &&
+              *srcptr == *szMacParm[nMacParms])
+        {
+        srcptr++;
+        break;
+        }
+      else
+        srcptr++;
+      }
+    if (*srcptr == ' ')                 /* ' ' terminates in TSC             */
+      {
+      if (dwOptions & OPTION_TSC)
+        {
+        *srcptr++ = '\0';
+        break;
+        }
+      else
+        skipspace();
+      }
+    else if (*srcptr == ',')            /* advance to next                   */
+      {
+      *srcptr++ = '\0';
+      if (++nMacParms >= 10)
+        break;
+      if (!(dwOptions & OPTION_TSC))
+        skipspace();
+      }
     }
-  if (*srcptr && *srcptr != ',')
-    {
-    *srcptr++ = '\0';
-    if (!(dwOptions & OPTION_TSC))
-      skipspace();
-    }
-  nMacParms++;
-  if (nMacParms >= 10)
-    break;
-  } while (*srcptr == ',');
+  }
 
 /*---------------------------------------------------------------------------*/
 /* OK, got macro arguments &0...&9 now                                       */
@@ -6484,12 +6524,11 @@ while (pmac)                            /* walk through the macro lines      */
       }
     }
 
-  if (terminate)                        /* if macro termination needed       */
-    break;                              /* terminate here                    */
-
   if (!skipit && !suppress[ifcount])    /* if not skipping this one          */
     {                                   /* add line to source                */
-    pcur = allocline(pcur, curline->fn, curline->ln, LINCAT_MACEXP, szLine);
+    pcur = allocline(pcur, curline->fn, curline->ln,
+                     (unsigned char)(LINCAT_MACEXP | curlvl),
+                     szLine);
     if (!pcur)
       {
       error |= ERR_MALLOC;
@@ -6501,9 +6540,12 @@ while (pmac)                            /* walk through the macro lines      */
       error = ERR_OK;
       warning = WRN_OK;
       expandtext();
-      processline();
       }
     }
+
+  if (terminate)                        /* if macro termination needed       */
+    break;                              /* terminate here                    */
+
   pmac = pmac->next;
   }
 
@@ -6689,12 +6731,17 @@ if (isValidNameChar(*srcptr, 1))        /* mnemonic or macro name            */
     lpmac = findsym(namebuf, 0);        /* look whether opcode is a macro    */
     if (lpmac && lpmac->cat == SYMCAT_MACRO)
       {
-      if (pass == 1)                    /* if in pass 1                      */
-        {
-        curline->lvl |= LINCAT_MACINV;  /* mark as macro invocation          */
+      if (pass == 1 &&                  /* if in pass 1 and not in macro def */
+          !LINE_IS_MACDEF(curline->lvl))
+        {                               /* if on top level,                  */
+        if (!LINE_IS_MACEXP(curline->lvl))
+          curline->lvl |= LINCAT_MACINV;  /* mark as macro invocation        */
         if (dwOptions & OPTION_DLM)
           setlabel(lp);
-        expandmacro(lp, lpmac);         /* expand macro below current line   */
+        if (++lvlMacro <= LINCAT_LVLMASK)
+          expandmacro(lp, lpmac);       /* expand macro below current line   */
+        else                            /* unless nesting level is too deep  */
+          error |= ERR_NESTING;
         }
       }
     else
@@ -7009,8 +7056,10 @@ while (!terminate && pline)
       }
     else
       {
+#if FUCKIT
       if (pass != 1 ||
           !(curline->lvl & LINCAT_MACEXP))
+#endif
         processline();
       error = ERR_OK;
       warning = WRN_OK;
