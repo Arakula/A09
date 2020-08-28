@@ -72,8 +72,8 @@ Hermann Seib, 2020
 Over the years, A09 has learned quite a lot, and it can handle source files / 
 list files in various formats. To allow their selection, I have expanded the 
 scope of the <b>OPT</b> directive (see the FLEX9 Assembler Manual that can be 
-found in the Documentation section on [
-www.flexusergroup.com](http://www.flexusergroup.com) for details). Here's the list of additional options 
+found in the Documentation section on [www.flexusergroup.com](http://www.flexusergroup.com)
+for details). Here's the list of additional options 
 available in A09 (* denotes the default value for a mutually exclusive set):
 
 
@@ -282,7 +282,7 @@ This option makes it easier to create complex patches to be embedded in images p
   <tr>
     <td valign="top"><b>DLM</b></td>
     <td>define label on macro expansion; see
-        [https://github.com/Arakula/A09/issues/1](https://github.com/Arakula/A09/issues/1)
+<a href="https://github.com/Arakula/A09/issues/1">Issue #1</a>
         for details.
     </td>
   </tr>
@@ -333,7 +333,7 @@ of these programs). Apart from these, it knows the following directives:
     <td valign="top"><b>FILL <i>value</i>,<i>bytecount</i></b></td>
 	<td valign="top">writes the 8-bit value <b><i>value</i></b> into <b><i>bytecount</i></b> consecutive memory locations  
 
-	<b>Note:</b> if <b><i>bytecount</i></b> exceeds 255 and <b>OPT MUL</b> (see above) is set, only the first 255 bytes are shown
+<b>Note:</b> if <b><i>bytecount</i></b> exceeds 255 and <b>OPT MUL</b> (see above) is set, only the first 255 bytes are shown
 	in the listing.</td>
   </tr>
   <tr>
@@ -341,7 +341,7 @@ of these programs). Apart from these, it knows the following directives:
 	<td valign="top">assembles the block up to the next <b>ELSE</b> or <b>ENDIF</b>
 	directive if the symbol is (not) defined.  
 
-	<b>Attention:</b> this directive is a little bit dangerous - if the symbol is defined
+<b>Attention:</b> this directive is a little bit dangerous - if the symbol is defined
 	<i>after</i> the <b>IF(N)D</b> directive, phasing errors can occur!</td>
   </tr>
   <tr>
@@ -351,7 +351,7 @@ DEPHASE</b></td>
     the specified address. This "shifting" is switched off by the instruction
 	<b>DEPHASE</b>.  
 
-	This can be useful for generation of EPROM contents which contain overlayed code banks
+This can be useful for generation of EPROM contents which contain overlayed code banks
 	where code has to be stored at an address in the EPROM (governed by <b>ORG</b>), but is
 	<i>executed</i> at a different address (governed by <b>PHASE</b>).</td>
   </tr>
@@ -365,9 +365,8 @@ DEPHASE</b></td>
     <td valign="top">works like the <b>RMB</b> directive (see ASMB documentation), but
     it doesn't only reserve memory, but also zeroes the reserved bytes  
 
-	<b>Note:</b> if <b><i>nnn</i></b> exceeds 255 and <b>OPT MUL</b> (see above) is set, only the first 255 bytes are shown
+<b>Note:</b> if <b><i>nnn</i></b> exceeds 255 and <b>OPT MUL</b> (see above) is set, only the first 255 bytes are shown
 	in the listing.</td>
-    
   </tr>
   <tr>
     <td valign="top"><b>SETLI <i>nnn</i></b></td>
