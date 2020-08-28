@@ -257,6 +257,8 @@
                        Ray Bellis for pointing that out. See
                          https://github.com/Arakula/A09/issues/8
                        for details.
+                     Macro expansion didn't correctly expand texts; thanks to
+                       Ray Bellis for pointing that out. Also Issue 8.
 
 */
 
@@ -6350,11 +6352,31 @@ while (pmac)                            /* walk through the macro lines      */
       s++;
       *d++ = *s++;
       }
-    else if (*s == '&' && s[1] >= '0' && s[1] <= '9')
+    else if (*s == '&')
       {
-      strcpy(d, szMacParm[s[1] - '0']);
-      s += 2;
-      d += strlen(d);
+      if (s[1] >= '0' && s[1] <= '9')
+        {
+        strcpy(d, szMacParm[s[1] - '0']);
+        s += 2;
+        d += strlen(d);
+        }
+      else
+        {
+        struct symrecord *lp;
+        char *nc;
+        parsename(s + 1, &nc);
+        lp = findsym(namebuf, 0);
+        if (lp && *namebuf &&           /* if symbol IS a text constant,     */
+            (lp->cat == SYMCAT_TEXT))
+          {                             /* insert its content                */
+          int i, j = (int)(d - szLine);
+          for (i = 0; j < LINELEN && texts[lp->value][i]; i++, j++)
+            *d++ = texts[lp->value][i];
+          s = nc;
+          }
+        else
+          *d++ = *s++;
+        }
       }
     else
       *d++ = *s++;
@@ -7056,11 +7078,7 @@ while (!terminate && pline)
       }
     else
       {
-#if FUCKIT
-      if (pass != 1 ||
-          !(curline->lvl & LINCAT_MACEXP))
-#endif
-        processline();
+      processline();
       error = ERR_OK;
       warning = WRN_OK;
       }
