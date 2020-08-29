@@ -1,7 +1,7 @@
 /* A09, 6809 Assembler. 
    
    (C) Copyright 1993,1994 L.C. Benschop. 
-   Parts (C) Copyright 2001-2018 H. Seib.
+   Parts (C) Copyright 2001-2020 H. Seib.
    This version of the program is distributed under the terms and conditions 
    of the GNU General Public License version 2. See file the COPYING for details.   
    THERE IS NO WARRANTY ON THIS PROGRAM. 
@@ -259,6 +259,19 @@
                        for details.
                      Macro expansion didn't correctly expand texts; thanks to
                        Ray Bellis for pointing that out. Also Issue 8.
+   v1.44  2020-08-29 Macros can override mnemonics now; a \ before the mnemonic
+                       prohibits macro invocation and uses the original mnemonic.
+                     TEXT pseudo-op interpreted trailing blanks wrong.
+                     TEXT and macro parameter expansion does NOT include leading
+                       and trailing string delimiters in the output any more;
+                       this is RELASMB-compatible and allows more constructs.
+                       As an indirect consequence, "&gotcha" now REPLACES &text
+                       with the contents of a text named gotcha; if you want
+                       the verbatim output, you need to write it as "\&gotcha".
+                     bitdirect() and the ~ operator on constants didn't work correctly;
+                       thanks to Ray Bellis for pointing that out. See
+                         https://github.com/Arakula/A09/issues/9
+                       for details.
 
 */
 
@@ -289,8 +302,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.43"
-#define VERSNUM      "$012B"            /* can be queried as &VERSION        */
+#define VERSION      "1.44"
+#define VERSNUM      "$012C"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -2390,8 +2403,6 @@ return dest;
 int settext(char *namebuf, char *text)
 {
 struct symrecord *lp = findsym(namebuf, 1);
-int len;
-int special = 0;
 
 if (!lp)
   {
@@ -2421,27 +2432,9 @@ else
 if (!text)                              /* if NULL input                     */
   text = "";                            /* assume empty string               */
 
-for (len = 0; text[len]; len++)
-  if ((isspace(text[len])) ||
-      (text[len] == ','))
-    special = 1;
-if (!len)                               /* empty string?                     */
-  special = 1;                          /* that's special anyway.            */
-if (special && len &&                   /* if delimited special string       */
-    (text[0] == '\'' || text[0] == '\"') &&
-    (text[len - 1] == text[0]))
-  special = 0;                          /* forget that "special" flag        */
-
-len += (special) ? 3 : 1;
-texts[lp->value] = malloc(len);
+texts[lp->value] = malloc(strlen(text) + 1);
 if (texts[lp->value])
-  {
-  if (special)
-    texts[lp->value][0] = '\"';
-  strcpy(texts[lp->value] + special, text);
-  if (special)
-    strcat(texts[lp->value], "\"");
-  }
+  strcpy(texts[lp->value], text);
 
 if (!strcmp(namebuf, "FILCHR"))         /* special for FILCHR : set internal */
   {                                     /* byte                              */
@@ -3035,7 +3028,7 @@ while (parsing)
       RESOLVECAT
       break;
     case '<':
-      if (*(srcptr) == '<')
+      if (*srcptr == '<')
         {
         if (level >= 8)
           EXITEVAL
@@ -3044,7 +3037,7 @@ while (parsing)
         t <<= scanexpr(8, &p);
         exprcat |= oldcat | EXPRCAT_FIXED;
         }
-      else if (*(srcptr) == '=')
+      else if (*srcptr == '=')
         {
         if (level >= 7)
           EXITEVAL
@@ -3063,7 +3056,7 @@ while (parsing)
         }
       break;
     case '>':
-      if (*(srcptr) == '>')
+      if (*srcptr == '>')
         {
         if (level >= 8)
           EXITEVAL
@@ -3072,7 +3065,7 @@ while (parsing)
         t >>= scanexpr(8, &p);
         exprcat |= oldcat | EXPRCAT_FIXED;
         }
-      else if (*(srcptr) == '=')
+      else if (*srcptr == '=')
         {
         if (level>=7)
           EXITEVAL
@@ -4875,8 +4868,11 @@ unsigned short dir;
 skipspace();
 if (*srcptr++ != '#')
   error |= ERR_EXPR;
+if (!(dwOptions & OPTION_TSC))
+  skipspace();
 dir = (unsigned short)scanexpr(0, &p);
-if (dir & 0xff00)
+/* check for overflow - is this necessary? Don't know ... */
+if (dir > 0xff && dir < 0xff00)
   error |= ERR_EXPR;
 if (!(dwOptions & OPTION_TSC))
   skipspace();
@@ -5084,29 +5080,27 @@ void expandtext()
 {
 char *p;
 int i, j = 0;
-int doit = 1;
 
 for (p = curline->txt; (*p) && (j < LINELEN); )
   {
-  if (*p == '\"')
-    doit = !doit;
-
-  if (*p == '\\' && p[1] == '&')
-    srcline[j++] = *(++p);
-  else if (*p == '&' &&
-           (p[1] < '0' || p[1] > '9') &&
-           doit)
+  if (*p == '\\' && p[1] == '&')        /* when encountering \&,             */
+    {
+    srcline[j++] = *(++p);              /* swallow the \,                    */
+    p++;                                /* keep and skip over the &          */
+    }
+  else if (*p == '&' && (p[1] < '0' || p[1] > '9'))
     {
     struct symrecord *lp;
     srcptr = p + 1;
     scanname();
     lp = findsym(namebuf, 0);
-    if ((lp) && (*namebuf) &&           /* if symbol IS a text constant,     */
+    if (lp && *namebuf &&               /* if symbol IS a text constant,     */
         (lp->cat == SYMCAT_TEXT))
       {                                 /* insert its content                */
+      char *from = texts[lp->value];
+      for (i = 0; j < LINELEN && from[i]; i++)
+        srcline[j++] = from[i];
       p = srcptr;
-      for (i = 0; j < LINELEN && texts[lp->value][i]; i++)
-        srcline[j++] = texts[lp->value][i];
       }
     else                                /* otherwise                         */
       srcline[j++] = *p++;              /* simply use the '&' and go on.     */
@@ -6131,7 +6125,10 @@ switch (co)
              lp->cat != SYMCAT_TEXT)
       error |= ERR_LABEL_MULT;
     else                                /* if all OK, (re)define text        */
-      settext(lp->name, srcptr);
+      {
+      scanstring(szBuf1, sizeof(szBuf1));
+      settext(lp->name, szBuf1);
+      }
     break;
   case PSEUDO_NAME :                    /* NAME <modulename> ?               */
     if (!(dwOptions & OPTION_TSC))
@@ -6281,8 +6278,6 @@ srcptr = szMacInv;                      /* set pointer to internal buffer    */
 
 while (*srcptr)                         /* while there are parameters        */
   {
-  szMacParm[nMacParms] = srcptr;        /* store parameter start pointer     */
-
   if (*srcptr == ',')                   /* if parameter delimiter            */
     {
     *srcptr++ = '\0';                   /* delimit & advance behind it       */
@@ -6293,6 +6288,7 @@ while (*srcptr)                         /* while there are parameters        */
     }
   else                                  /* otherwise walk thru parameter     */
     {
+    szMacParm[nMacParms] = srcptr;      /* store parameter start pointer     */
     if ((*srcptr == '\'') ||            /* if delimited string               */
         (*srcptr == '\"'))
       {
@@ -6307,7 +6303,8 @@ while (*srcptr)                         /* while there are parameters        */
       else if (nInString &&
               *srcptr == *szMacParm[nMacParms])
         {
-        srcptr++;
+        szMacParm[nMacParms]++;
+        *srcptr++ = '\0';
         break;
         }
       else
@@ -6356,9 +6353,11 @@ while (pmac)                            /* walk through the macro lines      */
       {
       if (s[1] >= '0' && s[1] <= '9')
         {
-        strcpy(d, szMacParm[s[1] - '0']);
+        char *from = szMacParm[s[1] - '0'];
+        int i = 0, j = (int)(d - szLine);
+        for (; j < LINELEN && from[i]; i++, j++)
+          *d++ = from[i];
         s += 2;
-        d += strlen(d);
         }
       else
         {
@@ -6369,9 +6368,10 @@ while (pmac)                            /* walk through the macro lines      */
         if (lp && *namebuf &&           /* if symbol IS a text constant,     */
             (lp->cat == SYMCAT_TEXT))
           {                             /* insert its content                */
-          int i, j = (int)(d - szLine);
-          for (i = 0; j < LINELEN && texts[lp->value][i]; i++, j++)
-            *d++ = texts[lp->value][i];
+          int i = 0, j = (int)(d - szLine);
+          char *from = texts[lp->value];
+          for (; j < LINELEN && from[i]; i++, j++)
+            *d++ = from[i];
           s = nc;
           }
         else
@@ -6589,6 +6589,7 @@ int co;
 unsigned short cat;
 char c;
 char noimm;
+char nomac = 0;
 
 #if 0
 srcptr = curline->txt;
@@ -6619,152 +6620,160 @@ if (isValidNameChar(*srcptr, 1))        /* look for label on line start      */
     lp->u.flags |= SYMFLAG_PASSED;
   } 
 skipspace();
+
+if (*srcptr == '\\')                    /* if macro explicitly prohibited    */
+  {
+  srcptr++;
+  nomac = 1;
+  }
+
 if (isValidNameChar(*srcptr, 1))        /* mnemonic or macro name            */
   {
   scanname();
-  if ((dwOptions & OPTION_H09) &&       /* adjust some mnemonics             */
-      ((!strcmp(unamebuf, "ASLD")) ||   /* that are available in the 6309    */
-       (!strcmp(unamebuf, "ASRD")) ||   /* but are implemented as (slower)   */
-       (!strcmp(unamebuf, "LSLD")) ||   /* convenience instructions on the   */
-       (!strcmp(unamebuf, "LSRD")) ||   /* 6809                              */
-       (!strcmp(unamebuf, "DECD")) ||
-       (!strcmp(unamebuf, "INCD")) ||
-       (!strcmp(unamebuf, "CLRD"))))
-    strcat(unamebuf, "63");
-  op = findop(unamebuf);
-  if (op)
-    {
-    if ((dwOptions & OPTION_TSC))       /* if TSC compatible, skip space NOW */
-      skipspace();                      /* since it's not allowed inside arg */
-    if (op->cat != OPCAT_PSEUDO)
-      {
-      setlabel(lp);
-      if (!inMacro)
-        generating = 1;
-      }
-    co = op->code;
-    cat = op->cat;
-                                        /* only pseudo-ops in common mode!   */
-    if (common && (cat != OPCAT_PSEUDO))
-      error |= ERR_EXPR;
-
-    noimm = cat & OPCAT_NOIMM;          /* isolate "no immediate possible"   */
-    cat &= ~OPCAT_NOIMM;
-    if (dwOptions & OPTION_H09)         /* if in HD6309 mode,                */
-      cat &= ~OPCAT_6309;               /* mask out the 6309 flag (=allow)   */
-    if (dwOptions & OPTION_H01)         /* if in HD6301 mode,                */
-      cat &= ~OPCAT_6301;               /* mask out the 6301 flag (=allow)   */
-    switch (cat)
-      {
-      case OPCAT_ONEBYTE :
-        onebyte(co);
-        break;
-      case OPCAT_TWOBYTE :
-        twobyte(co);
-        break;
-      case OPCAT_THREEBYTE :
-        threebyte(co);
-        break;
-      case OPCAT_FOURBYTE :
-        fourbyte(co);
-        break;
-      case OPCAT_2IMMBYTE :             /* 6309 only                         */
-        putbyte((unsigned char)(co >> 8));
-        /* fall thru on purpose! */
-      case OPCAT_IMMBYTE :
-        oneimm(co);
-        break;
-      case OPCAT_LEA :
-        lea(co);
-        break;
-      case OPCAT_SBRANCH :
-        sbranch(co);
-        break;
-      case OPCAT_LBR2BYTE :
-        lbranch(co);
-        break;
-      case OPCAT_LBR1BYTE :
-        lbra(co);
-        break;
-      case OPCAT_2ARITH :               /* 6309 only                         */
-        putbyte((unsigned char)(co >> 8));
-        /* fall thru on purpose! */
-      case OPCAT_ARITH :
-        arith(co, noimm);
-        break;
-      case OPCAT_ACCARITH :             /* 6800-style arith                  */
-        accarith(co, noimm, 0);
-        break;
-      case OPCAT_DBLREG1BYTE :
-        darith(co, noimm);
-        break;
-      case OPCAT_DBLREG2BYTE :
-        d2arith(co, noimm);
-        break;
-      case OPCAT_SINGLEADDR :
-        oneaddr(co);
-        break;
-      case OPCAT_IREG :                 /* 6309 only                         */
-        putbyte((unsigned char)(co >> 8));
-        /* fall thru on purpose! */
-      case OPCAT_2REG :
-        tfrexg(co);
-        break;
-      case OPCAT_STACK :
-        pshpul(co);
-        break;
-      case OPCAT_BITDIRECT :            /* 6301/6309 only                    */
-        bitdirect(co);
-        break;
-      case OPCAT_BITTRANS :             /* 6309 only                         */
-        bittrans(co);
-        break;
-      case OPCAT_BLOCKTRANS :           /* 6309 only                         */
-        blocktrans(co);
-        break;
-      case OPCAT_QUADREG1BYTE :
-        qarith(co, noimm);
-        break;
-      case OPCAT_IDXEXT :
-        idxextarith(co);
-        break;
-      case OPCAT_ACCADDR :
-        accaddr(co);
-        break;
-      case OPCAT_PSEUDO :
-        pseudoop(co, lp);
-        break;
-      default :
-        error |= ERR_ILLEGAL_MNEM;
-        break;
-      }
-    c = *srcptr;                        /* get current character             */
-    if (((dwOptions & OPTION_TSC) && (c == '*')) ||
-        ((dwOptions & OPTION_GAS) && (c == '|')) ||
-        (c == ';'))
-      c = '\0';
-    if (c != ' ' &&
-        *(srcptr - 1) != ' ' &&
-        c != '\0')
-      error |= ERR_ILLEGAL_ADDR; 
-    }
-  else
-    {
+  if (!nomac)                           /* if macro allowed                  */
     lpmac = findsym(namebuf, 0);        /* look whether opcode is a macro    */
-    if (lpmac && lpmac->cat == SYMCAT_MACRO)
+  if (lpmac && lpmac->cat == SYMCAT_MACRO)
+    {
+    if (pass == 1 &&                    /* if in pass 1 and not in macro def */
+        !LINE_IS_MACDEF(curline->lvl))
+      {                                 /* if on top level,                  */
+      if (!LINE_IS_MACEXP(curline->lvl))
+        curline->lvl |= LINCAT_MACINV;  /* mark as macro invocation          */
+      if (dwOptions & OPTION_DLM)
+        setlabel(lp);
+      if (++lvlMacro <= LINCAT_LVLMASK)
+        expandmacro(lp, lpmac);         /* expand macro below current line   */
+      else                              /* unless nesting level is too deep  */
+        error |= ERR_NESTING;
+      }
+    }
+  else                                  /* no macro, so check mnemonics      */
+    {
+    if ((dwOptions & OPTION_H09) &&     /* adjust some mnemonics             */
+        ((!strcmp(unamebuf, "ASLD")) || /* that are available in the 6309    */
+        (!strcmp(unamebuf, "ASRD")) ||  /* but are implemented as (slower)   */
+        (!strcmp(unamebuf, "LSLD")) ||  /* convenience instructions on the   */
+        (!strcmp(unamebuf, "LSRD")) ||  /* 6809                              */
+        (!strcmp(unamebuf, "DECD")) ||
+        (!strcmp(unamebuf, "INCD")) ||
+        (!strcmp(unamebuf, "CLRD"))))
+      strcat(unamebuf, "63");
+    op = findop(unamebuf);
+    if (op)
       {
-      if (pass == 1 &&                  /* if in pass 1 and not in macro def */
-          !LINE_IS_MACDEF(curline->lvl))
-        {                               /* if on top level,                  */
-        if (!LINE_IS_MACEXP(curline->lvl))
-          curline->lvl |= LINCAT_MACINV;  /* mark as macro invocation        */
-        if (dwOptions & OPTION_DLM)
-          setlabel(lp);
-        if (++lvlMacro <= LINCAT_LVLMASK)
-          expandmacro(lp, lpmac);       /* expand macro below current line   */
-        else                            /* unless nesting level is too deep  */
-          error |= ERR_NESTING;
+      if ((dwOptions & OPTION_TSC))     /* if TSC compatible, skip space NOW */
+        skipspace();                    /* since it's not allowed inside arg */
+      if (op->cat != OPCAT_PSEUDO)
+        {
+        setlabel(lp);
+        if (!inMacro)
+          generating = 1;
         }
+      co = op->code;
+      cat = op->cat;
+                                        /* only pseudo-ops in common mode!   */
+      if (common && (cat != OPCAT_PSEUDO))
+        error |= ERR_EXPR;
+
+      noimm = cat & OPCAT_NOIMM;        /* isolate "no immediate possible"   */
+      cat &= ~OPCAT_NOIMM;
+      if (dwOptions & OPTION_H09)       /* if in HD6309 mode,                */
+        cat &= ~OPCAT_6309;             /* mask out the 6309 flag (=allow)   */
+      if (dwOptions & OPTION_H01)       /* if in HD6301 mode,                */
+        cat &= ~OPCAT_6301;             /* mask out the 6301 flag (=allow)   */
+      switch (cat)
+        {
+        case OPCAT_ONEBYTE :
+          onebyte(co);
+          break;
+        case OPCAT_TWOBYTE :
+          twobyte(co);
+          break;
+        case OPCAT_THREEBYTE :
+          threebyte(co);
+          break;
+        case OPCAT_FOURBYTE :
+          fourbyte(co);
+          break;
+        case OPCAT_2IMMBYTE :           /* 6309 only                         */
+          putbyte((unsigned char)(co >> 8));
+          /* fall thru on purpose! */
+        case OPCAT_IMMBYTE :
+          oneimm(co);
+          break;
+        case OPCAT_LEA :
+          lea(co);
+          break;
+        case OPCAT_SBRANCH :
+          sbranch(co);
+          break;
+        case OPCAT_LBR2BYTE :
+          lbranch(co);
+          break;
+        case OPCAT_LBR1BYTE :
+          lbra(co);
+          break;
+        case OPCAT_2ARITH :             /* 6309 only                         */
+          putbyte((unsigned char)(co >> 8));
+          /* fall thru on purpose! */
+        case OPCAT_ARITH :
+          arith(co, noimm);
+          break;
+        case OPCAT_ACCARITH :           /* 6800-style arith                  */
+          accarith(co, noimm, 0);
+          break;
+        case OPCAT_DBLREG1BYTE :
+          darith(co, noimm);
+          break;
+        case OPCAT_DBLREG2BYTE :
+          d2arith(co, noimm);
+          break;
+        case OPCAT_SINGLEADDR :
+          oneaddr(co);
+          break;
+        case OPCAT_IREG :                 /* 6309 only                         */
+          putbyte((unsigned char)(co >> 8));
+          /* fall thru on purpose! */
+        case OPCAT_2REG :
+          tfrexg(co);
+          break;
+        case OPCAT_STACK :
+          pshpul(co);
+          break;
+        case OPCAT_BITDIRECT :          /* 6301/6309 only                    */
+          bitdirect(co);
+          break;
+        case OPCAT_BITTRANS :           /* 6309 only                         */
+          bittrans(co);
+          break;
+        case OPCAT_BLOCKTRANS :         /* 6309 only                         */
+          blocktrans(co);
+          break;
+        case OPCAT_QUADREG1BYTE :
+          qarith(co, noimm);
+          break;
+        case OPCAT_IDXEXT :
+          idxextarith(co);
+          break;
+        case OPCAT_ACCADDR :
+          accaddr(co);
+          break;
+        case OPCAT_PSEUDO :
+          pseudoop(co, lp);
+          break;
+        default :
+          error |= ERR_ILLEGAL_MNEM;
+          break;
+        }
+      c = *srcptr;                      /* get current character             */
+      if (((dwOptions & OPTION_TSC) && (c == '*')) ||
+          ((dwOptions & OPTION_GAS) && (c == '|')) ||
+          (c == ';'))
+        c = '\0';
+      if (c != ' ' &&
+          *(srcptr - 1) != ' ' &&
+          c != '\0')
+        error |= ERR_ILLEGAL_ADDR; 
       }
     else
       error |= ERR_ILLEGAL_MNEM;

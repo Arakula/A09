@@ -589,7 +589,11 @@ which offer a better control over what gets assembled and what doesn't.
 #### Macros
 
 In RELASMB, nested macro definitions are allowed; in A09, they are not.
-Nested macro calls are possible; A09 allows up to 31 levels of macro call nesting.  
-&#10;In RELASMB, macros can be used to redefine mnemonics; in A09, this is not possible (yet).
+Nested macro calls, however, are possible; A09 allows up to 31 levels of macro call nesting.
 
+Like in RELASMB, macros can be used to redefine mnemonics, but with a little twist
+that is either missing in the original or undocumented: if the need arises to use the
+original mnemonic in certain places, it can be prefixed with a backslash (\);
+in this case, A09 doesn't check for macros but uses the original mnemonic.
+&#10;Prefixing a macro name that doesn't overload a mnemonic with \ leads to an error.
 
