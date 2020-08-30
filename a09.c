@@ -1643,6 +1643,9 @@ char *errormsg[]=
 #define WRN_SYM           0x0002        /* Symbolic text undefined           */
 #define WRN_AREA          0x0004        /* Area already in use               */
 #define WRN_AMBIG         0x0008        /* Ambiguous 6800 opcode             */
+#define WRN_ADR_TRUNC     0x0010        /* Forced address truncated          */
+#define WRN_IMM_TRUNC     0x0020        /* Immediate value truncated         */
+#define WRN_ILLF_IGN      0x0040        /* Illogical forcing ignored         */
 
 char *warningmsg[] =
   {
@@ -1651,9 +1654,9 @@ char *warningmsg[] =
   "Symbolic text undefined",            /* 2     WRN_SYM                     */
   "Area already in use",                /* 4     WRN_AREA                    */
   "Ambiguous 6800 alternate notation",  /* 8     WRN_AMBIG                   */
-  "",                                   /* 16                                */
-  "",                                   /* 32                                */
-  "",                                   /* 64                                */
+  "Forced address truncated",           /* 16    WRN_ADR_TRUNC               */
+  "Immediate value truncated",          /* 32    WRN_IMM_TRUNC               */
+  "Illogical forcing ignored",          /* 64    WRN_ILLF_IGN                */
   "",                                   /* 128                               */
   "",                                   /* 256                               */
   "",                                   /* 512                               */
@@ -4873,7 +4876,7 @@ if (!(dwOptions & OPTION_TSC))
 dir = (unsigned short)scanexpr(0, &p);
 /* check for overflow - is this necessary? Don't know ... */
 if (dir > 0xff && dir < 0xff00)
-  error |= ERR_EXPR;
+  warning |= WRN_IMM_TRUNC;
 if (!(dwOptions & OPTION_TSC))
   skipspace();
 if (*srcptr++ != ',')

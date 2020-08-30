@@ -530,14 +530,26 @@ the same set of types as the symbol table.
 
 My version of A09 aims to reproduce the behaviour of the Flex9 
 ASMB and RELASMB products. As of now, it reproduces about 99% of the originals' 
-functionality, and surpasses them in some areas. Some things still aren't implemented, however.
+functionality, and surpasses them in some areas.
+Some things still work slightly different or aren't implemented, however.
+
+#### Expression Operators
+
+In ASMB and RELASMB, ! denotes a "logical NOT operator"; "logical" in this
+context means that each bit is inverted.
+&#10;A09's original core came with a slightly different syntax for that, which
+obviously has its roots in the "C" language the assembler is written in;
+there, ! denotes a logical NOT (meaning that everything that's not 0
+results in 0, and zero results in 1) and ~ denotes a binary inversion, which
+corresponds to the ! in TSC's assemblers.
+&#10;I decided to keep A09's syntax, as it is more versatile -
+so ! has a slightly different meaning in A09 than in ASMB/RELASMB.
 
 #### Symbols
 
 A09 normally handles symbols with up to 32 significant characters.
 This is far more than the 6 (ASMB) or 8 (RELASMB) places in the predecessors
 and normally quite convenient, but it can cause problems when
-
   
 - dealing with old sources that rely on the old maximum to work
   
@@ -547,7 +559,6 @@ When creating RELASMB-compatible relocatable modules, the number of significant 
 is automatically reduced to 8. To resolve issues with old sources, the <b>SYMLEN</b> directive
 has been added in V1.10 (see above). The symbol table always shows the symbols reduced to the
 number of significant places, since that's how they are treated internally.
-
 
 #### Local Labels
 
@@ -565,7 +576,7 @@ When in Relocating Assembler mode, you can define <i>external labels</i> (i.e.,
 labels that refer to a location in another module, that are resolved by the 
 Linker/Loader at a later time). These labels can be used in expressions, but in 
 a more restricted way than in RELASMB, due to the way the parser works. If there 
-is&nbsp; a mixture of relocatable and external elements in the expression, the 
+is a mixture of relocatable and external elements in the expression, the 
 relocatable elements have to be in pairs so that they effectively cancel each 
 other's effect, just like in the original - but, additionally, the external 
 label has to be either the last element in the expression or the paired 
@@ -593,7 +604,7 @@ Nested macro calls, however, are possible; A09 allows up to 31 levels of macro c
 
 Like in RELASMB, macros can be used to redefine mnemonics, but with a little twist
 that is either missing in the original or undocumented: if the need arises to use the
-original mnemonic in certain places, it can be prefixed with a backslash (\\);
+original mnemonic in certain places, it can be prefixed with a backslash (\);
 in this case, A09 doesn't check for macros but uses the original mnemonic.
 &#10;Prefixing a macro name that doesn't overload a mnemonic with \ leads to an error.
 

@@ -523,7 +523,19 @@ the same set of types as the symbol table.</p>
 
 <p>My version of A09 aims to reproduce the behaviour of the Flex9 
 ASMB and RELASMB products. As of now, it reproduces about 99% of the originals' 
-functionality, and surpasses them in some areas. Some things still aren't implemented, however.</p>
+functionality, and surpasses them in some areas.
+Some things still work slightly different or aren't implemented, however.</p>
+
+<h4>Expression Operators</h4>
+<p>In ASMB and RELASMB, ! denotes a "logical NOT operator"; "logical" in this
+context means that each bit is inverted.<br />
+A09's original core came with a slightly different syntax for that, which
+obviously has its roots in the "C" language the assembler is written in;
+there, ! denotes a logical NOT (meaning that everything that's not 0
+results in 0, and zero results in 1) and ~ denotes a binary inversion, which
+corresponds to the ! in TSC's assemblers.
+<br />I decided to keep A09's syntax, as it is more versatile -
+so ! has a slightly different meaning in A09 than in ASMB/RELASMB.</p>
 
 <h4>Symbols</h4>
 
