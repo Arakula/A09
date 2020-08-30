@@ -604,7 +604,7 @@ Nested macro calls, however, are possible; A09 allows up to 31 levels of macro c
 
 Like in RELASMB, macros can be used to redefine mnemonics, but with a little twist
 that is either missing in the original or undocumented: if the need arises to use the
-original mnemonic in certain places, it can be prefixed with a backslash (\);
+original mnemonic in certain places, it can be prefixed with a backslash (\\);
 in this case, A09 doesn't check for macros but uses the original mnemonic.
 &#10;Prefixing a macro name that doesn't overload a mnemonic with \ leads to an error.
 
