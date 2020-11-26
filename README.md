@@ -1,4 +1,4 @@
-# A09 - 6800/6801/6809/6301/6309 Assembler
+# A09 - 6800/6801/6809/6301/6309/68HC11 Assembler
 
 Copyright (c) 1993,1994 L.C. Benschop  
 Parts Copyright (c) 2001-2020 Hermann Seib
@@ -251,6 +251,10 @@ This isn't fully implemented yet. At the moment, the only significant
   <tr bgcolor="#f0f0f0">
     <td valign="top"><b>H01|H03</b></td>
     <td>accept Hitachi 6301 mnemonics (slightly experimental)</td>
+  </tr>
+  <tr bgcolor="#f0f0f0">
+    <td valign="top"><b>H11</b></td>
+    <td>accept Motorola 68HC11 mnemonics (very experimental)</td>
   </tr>
   <tr>
     <td colspan="2" height="8" valign="top"></td>

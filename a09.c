@@ -302,8 +302,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.44"
-#define VERSNUM      "$012C"            /* can be queried as &VERSION        */
+#define VERSION      "1.45"
+#define VERSNUM      "$012D"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -362,35 +362,39 @@ struct oprecord
   };
 
                                         /* Instruction categories :          */
-#define OPCAT_ONEBYTE        0x00       /* one byte opcodes             NOP  */
-#define OPCAT_TWOBYTE        0x01       /* two byte opcodes             SWI2 */
-#define OPCAT_THREEBYTE      0x02       /* three byte opcodes            TAB */
-#define OPCAT_FOURBYTE       0x03       /* four byte opcodes             ABA */
-#define OPCAT_IMMBYTE        0x04       /* opcodes w. imm byte         ANDCC */
-#define OPCAT_LEA            0x05       /* load effective address       LEAX */
-#define OPCAT_SBRANCH        0x06       /* short branches               BGE  */
-#define OPCAT_LBR2BYTE       0x07       /* long branches 2 byte opc     LBGE */
-#define OPCAT_LBR1BYTE       0x08       /* long branches 2 byte opc     LBRA */
-#define OPCAT_ARITH          0x09       /* accumulator instr.           ADDA */
-#define OPCAT_DBLREG1BYTE    0x0a       /* double reg instr 1 byte opc  LDX  */
-#define OPCAT_DBLREG2BYTE    0x0b       /* double reg instr 2 byte opc  LDY  */
-#define OPCAT_SINGLEADDR     0x0c       /* single address instrs        NEG  */
-#define OPCAT_2REG           0x0d       /* 2 register instr         TFR,EXG  */
-#define OPCAT_STACK          0x0e       /* stack instr             PSHx,PULx */
-#define OPCAT_BITDIRECT      0x0f       /* direct bitmanipulation       AIM  */
-#define OPCAT_BITTRANS       0x10       /* direct bit transfer         BAND  */
-#define OPCAT_BLOCKTRANS     0x11       /* block transfer               TFM  */
-#define OPCAT_IREG           0x12       /* inter-register operations   ADCR  */
-#define OPCAT_QUADREG1BYTE   0x13       /* quad reg instr 1 byte opc    LDQ  */
-#define OPCAT_2IMMBYTE       0x14       /* 2byte opcode w. imm byte    BITMD */
-#define OPCAT_2ARITH         0x15       /* 2byte opcode accum. instr.   SUBE */
-#define OPCAT_ACCARITH       0x16       /* acc. instr. w.explicit acc   ADD  */
-#define OPCAT_IDXEXT         0x17       /* indexed/extended, 6800-style JMP  */
-#define OPCAT_ACCADDR        0x18       /* single address instrs, 6800  NEG  */
-#define OPCAT_PSEUDO         0x3f       /* pseudo-ops                        */
-#define OPCAT_6309           0x40       /* valid for 6309 only!              */
-#define OPCAT_NOIMM          0x80       /* immediate not allowed!       STD  */
-#define OPCAT_6301          0x100       /* valid for 6301 only!              */
+#define OPCAT_ONEBYTE        0x0000     /* one byte opcodes             NOP  */
+#define OPCAT_TWOBYTE        0x0001     /* two byte opcodes             SWI2 */
+#define OPCAT_THREEBYTE      0x0002     /* three byte opcodes            TAB */
+#define OPCAT_FOURBYTE       0x0003     /* four byte opcodes             ABA */
+#define OPCAT_IMMBYTE        0x0004     /* opcodes w. imm byte         ANDCC */
+#define OPCAT_LEA            0x0005     /* load effective address       LEAX */
+#define OPCAT_SBRANCH        0x0006     /* short branches               BGE  */
+#define OPCAT_LBR2BYTE       0x0007     /* long branches 2 byte opc     LBGE */
+#define OPCAT_LBR1BYTE       0x0008     /* long branches 2 byte opc     LBRA */
+#define OPCAT_ARITH          0x0009     /* accumulator instr.           ADDA */
+#define OPCAT_DBLREG1BYTE    0x000a     /* double reg instr 1 byte opc  LDX  */
+#define OPCAT_DBLREG2BYTE    0x000b     /* double reg instr 2 byte opc  LDY  */
+#define OPCAT_SINGLEADDR     0x000c     /* single address instrs        NEG  */
+#define OPCAT_2REG           0x000d     /* 2 register instr         TFR,EXG  */
+#define OPCAT_STACK          0x000e     /* stack instr             PSHx,PULx */
+#define OPCAT_BITDIRECT      0x000f     /* direct bitmanipulation       AIM  */
+#define OPCAT_BITTRANS       0x0010     /* direct bit transfer         BAND  */
+#define OPCAT_BLOCKTRANS     0x0011     /* block transfer               TFM  */
+#define OPCAT_IREG           0x0012     /* inter-register operations   ADCR  */
+#define OPCAT_QUADREG1BYTE   0x0013     /* quad reg instr 1 byte opc    LDQ  */
+#define OPCAT_2IMMBYTE       0x0014     /* 2byte opcode w. imm byte    BITMD */
+#define OPCAT_2ARITH         0x0015     /* 2byte opcode accum. instr.   SUBE */
+#define OPCAT_ACCARITH       0x0016     /* acc. instr. w.explicit acc   ADD  */
+#define OPCAT_IDXEXT         0x0017     /* indexed/extended, 6800-style JMP  */
+#define OPCAT_ACCADDR        0x0018     /* single address instrs, 6800  NEG  */
+#define OPCAT_SETMASK        0x0019     /* set/clear with mask, 68HC11 BCLR  */
+#define OPCAT_BRMASK         0x001a     /* branch with mask, 68HC11   BRCLR  */
+#define OPCAT_PSEUDO         0x003f     /* pseudo-ops                        */
+#define OPCAT_6309           0x0040     /* valid for 6309 only!              */
+#define OPCAT_NOIMM          0x0080     /* immediate not allowed!       STD  */
+#define OPCAT_6301           0x0100     /* valid for 6301 only!              */
+#define OPCAT_PAGE18         0x0200     /* operation with prefix 18 (68HC11) */
+#define OPCAT_PAGE1A         0x0400     /* operation with prefix 1A (68HC11) */
 
                                         /* the various Pseudo-Ops            */
 #define PSEUDO_RMB            0
@@ -1336,6 +1340,245 @@ struct oprecord optable01[]=
   { "ZMB",     OPCAT_PSEUDO,      PSEUDO_RZB },
   };
 
+struct oprecord optable11[]=
+  {
+  { "ABA",     OPCAT_ONEBYTE,     0x1b },
+  { "ABS",     OPCAT_PSEUDO,      PSEUDO_ABS },
+  { "ABX",     OPCAT_ONEBYTE,     0x3a },
+  { "ABY",     OPCAT_TWOBYTE,     0x183a },
+  { "ADC",     OPCAT_ACCARITH,    0x89 },
+  { "ADCA",    OPCAT_ARITH,       0x89 },
+  { "ADCB",    OPCAT_ARITH,       0xc9 },
+  { "ADD",     OPCAT_ACCARITH,    0x8b },
+  { "ADDA",    OPCAT_ARITH,       0x8b },
+  { "ADDB",    OPCAT_ARITH,       0xcb },
+  { "ADDD",    OPCAT_DBLREG1BYTE, 0xc3 },
+  { "AND",     OPCAT_ACCARITH,    0x84 },
+  { "ANDA",    OPCAT_ARITH,       0x84 },
+  { "ANDB",    OPCAT_ARITH,       0xc4 },
+  { "ASL",     OPCAT_ACCADDR,     0x08 },
+  { "ASLA",    OPCAT_ONEBYTE,     0x48 },
+  { "ASLB",    OPCAT_ONEBYTE,     0x58 },
+  { "ASLD",    OPCAT_ONEBYTE,     0x05 },
+  { "ASR",     OPCAT_ACCADDR,     0x07 },
+  { "ASRA",    OPCAT_ONEBYTE,     0x47 },
+  { "ASRB",    OPCAT_ONEBYTE,     0x57 },
+  { "BCC",     OPCAT_SBRANCH,     0x24 },
+  { "BCLR",    OPCAT_SETMASK,     0x15 },
+  { "BCS",     OPCAT_SBRANCH,     0x25 },
+  { "BEC",     OPCAT_SBRANCH,     0x24 },
+  { "BEQ",     OPCAT_SBRANCH,     0x27 },
+  { "BES",     OPCAT_SBRANCH,     0x25 },
+  { "BGE",     OPCAT_SBRANCH,     0x2c },
+  { "BGT",     OPCAT_SBRANCH,     0x2e },
+  { "BHI",     OPCAT_SBRANCH,     0x22 },
+  { "BHS",     OPCAT_SBRANCH,     0x24 },
+  { "BIN",     OPCAT_PSEUDO,      PSEUDO_BINARY },
+  { "BINARY",  OPCAT_PSEUDO,      PSEUDO_BINARY },
+  { "BIT",     OPCAT_ACCARITH,    0x85 },
+  { "BITA",    OPCAT_ARITH,       0x85 },
+  { "BITB",    OPCAT_ARITH,       0xc5 },
+  { "BLE",     OPCAT_SBRANCH,     0x2f },
+  { "BLO",     OPCAT_SBRANCH,     0x25 },
+  { "BLS",     OPCAT_SBRANCH,     0x23 },
+  { "BLT",     OPCAT_SBRANCH,     0x2d },
+  { "BMI",     OPCAT_SBRANCH,     0x2b },
+  { "BNE",     OPCAT_SBRANCH,     0x26 },
+  { "BPL",     OPCAT_SBRANCH,     0x2a },
+  { "BRA",     OPCAT_SBRANCH,     0x20 },
+  { "BRA",     OPCAT_SBRANCH,     0x20 },
+  { "BRCLR",   OPCAT_BRMASK,      0x13 },
+  { "BRN",     OPCAT_SBRANCH,     0x21 },
+  { "BRSET",   OPCAT_BRMASK,      0x12 },
+  { "BSET",    OPCAT_SETMASK,     0x14 },
+  { "BSR",     OPCAT_SBRANCH,     0x8d },
+  { "BSZ",     OPCAT_PSEUDO,      PSEUDO_RZB },  // AS9 style
+  { "BVC",     OPCAT_SBRANCH,     0x28 },
+  { "BVS",     OPCAT_SBRANCH,     0x29 },
+  { "CBA",     OPCAT_ONEBYTE,     0x11 },
+  { "CLC",     OPCAT_ONEBYTE,     0x0c },
+  { "CLI",     OPCAT_ONEBYTE,     0x0e },
+  { "CLR",     OPCAT_ACCADDR,     0x0f },
+  { "CLRA",    OPCAT_ONEBYTE,     0x4f },
+  { "CLRB",    OPCAT_ONEBYTE,     0x5f },
+  { "CLV",     OPCAT_ONEBYTE,     0x0a },
+  { "CMP",     OPCAT_ACCARITH,    0x81 },
+  { "CMPA",    OPCAT_ARITH,       0x81 },
+  { "CMPB",    OPCAT_ARITH,       0xc1 },
+  { "COM",     OPCAT_ACCADDR,     0x03 },
+  { "COMA",    OPCAT_ONEBYTE,     0x43 },
+  { "COMB",    OPCAT_ONEBYTE,     0x53 },
+  { "CPD",     OPCAT_PAGE1A |
+               OPCAT_DBLREG1BYTE, 0x83 },
+  { "CPX",     OPCAT_DBLREG1BYTE, 0x8c },
+  { "CPY",     OPCAT_PAGE18 |
+               OPCAT_DBLREG1BYTE, 0x8c },
+  { "DAA",     OPCAT_ONEBYTE,     0x19 },
+  { "DEC",     OPCAT_ACCADDR,     0x0a },
+  { "DECA",    OPCAT_ONEBYTE,     0x4a },
+  { "DECB",    OPCAT_ONEBYTE,     0x5a },
+  { "DEF",     OPCAT_PSEUDO,      PSEUDO_DEF },
+  { "DEFINE",  OPCAT_PSEUDO,      PSEUDO_DEF },
+  { "DEPHASE", OPCAT_PSEUDO,      PSEUDO_DEPHASE },
+  { "DES",     OPCAT_ONEBYTE,     0x34 },
+  { "DEX",     OPCAT_ONEBYTE,     0x09 },
+  { "DEY",     OPCAT_TWOBYTE,     0x1809 },
+  { "DUP",     OPCAT_PSEUDO,      PSEUDO_DUP },
+  { "ELSE",    OPCAT_PSEUDO,      PSEUDO_ELSE },
+  { "END",     OPCAT_PSEUDO,      PSEUDO_END },
+  { "ENDCOM",  OPCAT_PSEUDO,      PSEUDO_ENDCOM },
+  { "ENDD",    OPCAT_PSEUDO,      PSEUDO_ENDD },
+  { "ENDDEF",  OPCAT_PSEUDO,      PSEUDO_ENDDEF },
+  { "ENDIF",   OPCAT_PSEUDO,      PSEUDO_ENDIF },
+  { "ENDM",    OPCAT_PSEUDO,      PSEUDO_ENDM },
+  { "EOR",     OPCAT_ACCARITH,    0x88 },
+  { "EORA",    OPCAT_ARITH,       0x88 },
+  { "EORB",    OPCAT_ARITH,       0xc8 },
+  { "EQU",     OPCAT_PSEUDO,      PSEUDO_EQU },
+  { "ERR",     OPCAT_PSEUDO,      PSEUDO_ERR },
+  { "EXITM",   OPCAT_PSEUDO,      PSEUDO_EXITM },
+  { "EXT",     OPCAT_PSEUDO,      PSEUDO_EXT },
+  { "EXTERN",  OPCAT_PSEUDO,      PSEUDO_EXT },
+  { "FCB",     OPCAT_PSEUDO,      PSEUDO_FCB },
+  { "FCC",     OPCAT_PSEUDO,      PSEUDO_FCC },
+  { "FCW",     OPCAT_PSEUDO,      PSEUDO_FCW },
+  { "FDB",     OPCAT_PSEUDO,      PSEUDO_FCW },
+  { "FDIV",    OPCAT_ONEBYTE,     0x03 },
+  { "FILL",    OPCAT_PSEUDO,      PSEUDO_FILL },
+  { "GLOBAL",  OPCAT_PSEUDO,      PSEUDO_PUB },
+  { "IDIV",    OPCAT_ONEBYTE,     0x02 },
+  { "IF",      OPCAT_PSEUDO,      PSEUDO_IF },
+  { "IFC",     OPCAT_PSEUDO,      PSEUDO_IFC },
+  { "IFD",     OPCAT_PSEUDO,      PSEUDO_IFD },
+  { "IFN",     OPCAT_PSEUDO,      PSEUDO_IFN },
+  { "IFNC",    OPCAT_PSEUDO,      PSEUDO_IFNC },
+  { "IFND",    OPCAT_PSEUDO,      PSEUDO_IFND },
+  { "INC",     OPCAT_ACCADDR,     0x0c },
+  { "INCA",    OPCAT_ONEBYTE,     0x4c },
+  { "INCB",    OPCAT_ONEBYTE,     0x5c },
+  { "INCLUDE", OPCAT_PSEUDO,      PSEUDO_INCLUDE },
+  { "INS",     OPCAT_ONEBYTE,     0x31 },
+  { "INX",     OPCAT_ONEBYTE,     0x08 },
+  { "INY",     OPCAT_TWOBYTE,     0x1808 },
+  { "JMP",     OPCAT_IDXEXT,      0x4e },
+  { "JSR",     OPCAT_NOIMM |
+               OPCAT_DBLREG1BYTE, 0x8d },
+  { "LDA",     OPCAT_ACCARITH,    0x86 },
+  { "LDAA",    OPCAT_ARITH,       0x86 },
+  { "LDAB",    OPCAT_ARITH,       0xc6 },
+  { "LDB",     OPCAT_ARITH,       0xc6 },
+  { "LDD",     OPCAT_DBLREG1BYTE, 0xcc },
+  { "LDS",     OPCAT_DBLREG1BYTE, 0x8e },
+  { "LDX",     OPCAT_DBLREG1BYTE, 0xce },
+  { "LDY",     OPCAT_PAGE18 |
+               OPCAT_DBLREG1BYTE, 0xce },
+  { "LIB",     OPCAT_PSEUDO,      PSEUDO_INCLUDE },
+  { "LIBRARY", OPCAT_PSEUDO,      PSEUDO_INCLUDE },
+  { "LSL",     OPCAT_ACCADDR,     0x08 },
+  { "LSLA",    OPCAT_ONEBYTE,     0x48 },
+  { "LSLB",    OPCAT_ONEBYTE,     0x58 },
+  { "LSLD",    OPCAT_ONEBYTE,     0x05 },
+  { "LSR",     OPCAT_ACCADDR,     0x04 },
+  { "LSRA",    OPCAT_ONEBYTE,     0x44 },
+  { "LSRB",    OPCAT_ONEBYTE,     0x54 },
+  { "LSRD",    OPCAT_ONEBYTE,     0x04 },
+  { "MACRO",   OPCAT_PSEUDO,      PSEUDO_MACRO },
+  { "MUL",     OPCAT_ONEBYTE,     0x3d },
+  { "NAM",     OPCAT_PSEUDO,      PSEUDO_NAM },
+  { "NAME",    OPCAT_PSEUDO,      PSEUDO_NAME },
+  { "NEG",     OPCAT_ACCADDR,     0x00 },
+  { "NEGA",    OPCAT_ONEBYTE,     0x40 },
+  { "NEGB",    OPCAT_ONEBYTE,     0x50 },
+  { "NOP",     OPCAT_ONEBYTE,     0x01 },
+  { "OPT",     OPCAT_PSEUDO,      PSEUDO_OPT },
+  { "OPTION",  OPCAT_PSEUDO,      PSEUDO_OPT },
+  { "ORA",     OPCAT_ARITH,       0x8a },
+  { "ORAA",    OPCAT_ARITH,       0x8a },
+  { "ORAB",    OPCAT_ARITH,       0xca },
+  { "ORB",     OPCAT_ARITH,       0xca },
+  { "ORG",     OPCAT_PSEUDO,      PSEUDO_ORG },
+  { "PAG",     OPCAT_PSEUDO,      PSEUDO_PAG },
+  { "PAGE",    OPCAT_PSEUDO,      PSEUDO_PAG },
+  { "PHASE",   OPCAT_PSEUDO,      PSEUDO_PHASE },
+  { "PSHA",    OPCAT_ONEBYTE,     0x36 },
+  { "PSHB",    OPCAT_ONEBYTE,     0x37 },
+  { "PSHX",    OPCAT_ONEBYTE,     0x3c },
+  { "PSHY",    OPCAT_TWOBYTE,     0x183c },
+  { "PUB",     OPCAT_PSEUDO,      PSEUDO_PUB },
+  { "PUBLIC",  OPCAT_PSEUDO,      PSEUDO_PUB },
+  { "PULA",    OPCAT_ONEBYTE,     0x32 },
+  { "PULB",    OPCAT_ONEBYTE,     0x33 },
+  { "PULX",    OPCAT_ONEBYTE,     0x38 },
+  { "PULY",    OPCAT_TWOBYTE,     0x1838 },
+  { "REG",     OPCAT_PSEUDO,      PSEUDO_REG },
+  { "REP",     OPCAT_PSEUDO,      PSEUDO_REP },
+  { "REPEAT",  OPCAT_PSEUDO,      PSEUDO_REP },
+  { "RMB",     OPCAT_PSEUDO,      PSEUDO_RMB },
+  { "ROL",     OPCAT_ACCADDR,     0x09 },
+  { "ROLA",    OPCAT_ONEBYTE,     0x49 },
+  { "ROLB",    OPCAT_ONEBYTE,     0x59 },
+  { "ROR",     OPCAT_ACCADDR,     0x06 },
+  { "RORA",    OPCAT_ONEBYTE,     0x46 },
+  { "RORB",    OPCAT_ONEBYTE,     0x56 },
+  { "RPT",     OPCAT_PSEUDO,      PSEUDO_REP },
+  { "RTI",     OPCAT_ONEBYTE,     0x3b },
+  { "RTS",     OPCAT_ONEBYTE,     0x39 },
+  { "RZB",     OPCAT_PSEUDO,      PSEUDO_RZB },
+  { "SBA",     OPCAT_ONEBYTE,     0x10 },
+  { "SBC",     OPCAT_ACCARITH,    0x82 },
+  { "SBCA",    OPCAT_ARITH,       0x82 },
+  { "SBCB",    OPCAT_ARITH,       0xc2 },
+  { "SEC",     OPCAT_ONEBYTE,     0x0d },
+  { "SEI",     OPCAT_ONEBYTE,     0x0f },
+  { "SET",     OPCAT_PSEUDO,      PSEUDO_SET },
+  { "SETLI",   OPCAT_PSEUDO,      PSEUDO_SETLI },
+  { "SETPG",   OPCAT_PSEUDO,      PSEUDO_SETPG },
+  { "SEV",     OPCAT_ONEBYTE,     0x0b },
+  { "SPC",     OPCAT_PSEUDO,      PSEUDO_SPC },
+  { "STA",     OPCAT_NOIMM |
+               OPCAT_ACCARITH,    0x87 },
+  { "STAA",    OPCAT_NOIMM |
+               OPCAT_ARITH,       0x87 },
+  { "STAB",    OPCAT_NOIMM |
+               OPCAT_ARITH,       0xc7 },
+  { "STD",     OPCAT_NOIMM |
+               OPCAT_DBLREG1BYTE, 0xcd },
+  { "STOP",    OPCAT_ONEBYTE,     0xcf },
+  { "STS",     OPCAT_NOIMM |
+               OPCAT_DBLREG1BYTE, 0x8f },
+  { "STTL",    OPCAT_PSEUDO,      PSEUDO_STTL },
+  { "STX",     OPCAT_NOIMM |
+               OPCAT_DBLREG1BYTE, 0xcf },
+  { "STY",     OPCAT_NOIMM |
+               OPCAT_PAGE18 |
+               OPCAT_DBLREG1BYTE, 0xcf },
+  { "SUB",     OPCAT_ACCARITH,    0x80 },
+  { "SUBA",    OPCAT_ARITH,       0x80 },
+  { "SUBB",    OPCAT_ARITH,       0xc0 },
+  { "SUBD",    OPCAT_DBLREG1BYTE, 0x83 },
+  { "SWI",     OPCAT_ONEBYTE,     0x3f },
+  { "SYMLEN",  OPCAT_PSEUDO,      PSEUDO_SYMLEN },
+  { "TAB",     OPCAT_ONEBYTE,     0x16 },
+  { "TAP",     OPCAT_ONEBYTE,     0x06 },
+  { "TBA",     OPCAT_ONEBYTE,     0x17 },
+  { "TEST",    OPCAT_ONEBYTE,     0x00 },
+  { "TEXT",    OPCAT_PSEUDO,      PSEUDO_TEXT },
+  { "TITLE",   OPCAT_PSEUDO,      PSEUDO_NAM },
+  { "TPA",     OPCAT_ONEBYTE,     0x07 },
+  { "TST",     OPCAT_ACCADDR,     0x0d },
+  { "TSTA",    OPCAT_ONEBYTE,     0x4d },
+  { "TSTB",    OPCAT_ONEBYTE,     0x5d },
+  { "TSX",     OPCAT_ONEBYTE,     0x30 },
+  { "TSY",     OPCAT_TWOBYTE,     0x1830 },
+  { "TTL",     OPCAT_PSEUDO,      PSEUDO_NAM },
+  { "TXS",     OPCAT_ONEBYTE,     0x35 },
+  { "TYS",     OPCAT_TWOBYTE,     0x1835 },
+  { "WAI",     OPCAT_ONEBYTE,     0x3e },
+  { "XGDX",    OPCAT_ONEBYTE,     0x8f },
+  { "XGDY",    OPCAT_TWOBYTE,     0x188f },
+  { "ZMB",     OPCAT_PSEUDO,      PSEUDO_RZB },
+  };
+
 /* expression categories...
    all zeros is ordinary constant.
    bit 1 indicates address within module.
@@ -1461,6 +1704,19 @@ struct regrecord regtable00[]=
   { 0,     0,    0    }
   };
 
+struct regrecord regtable11[]=
+  {
+  { "X",   0x01, 0x10 },
+  { "Y",   0x02, 0x20 },
+  { "S",   0x04, 0x40 },
+  { "PC",  0x05, 0x80 },
+  { "A",   0x08, 0x02 },
+  { "B",   0x09, 0x04 },
+  { "CC",  0x0a, 0x01 },
+  { "CCR", 0x0a, 0x01 },
+  { 0,     0,    0    }
+  };
+
 /*****************************************************************************/
 /* bitregtable : table of all bit transfer registers                         */
 /*****************************************************************************/
@@ -1524,6 +1780,7 @@ long relhdrfoff;                        /* FLEX Relocatable Global Hdr Offset*/
 #define OPTION_LIS    0x00800000L       /* print assembler output listing    */
 #define OPTION_LPA    0x01000000L       /* listing in f9dasm patch format    */
 #define OPTION_DLM    0x02000000L       /* define label on macro expansion   */
+#define OPTION_H11    0x04000000L       /* 68HC11 mode                       */
 
 struct
   {
@@ -1566,17 +1823,18 @@ struct
   { "NOG",           0, OPTION_GAS },
   { "REL",  OPTION_REL,          0 },
   { "NOR",           0, OPTION_REL },
-  { "H63",  OPTION_H09, OPTION_H01 | OPTION_M09 | OPTION_M00 | OPTION_M01 },
-  { "H09",  OPTION_H09, OPTION_H01 | OPTION_M09 | OPTION_M00 | OPTION_M01 },
-  { "M68",  OPTION_M09, OPTION_H01 | OPTION_H09 | OPTION_M00 | OPTION_M01 },
-  { "M09",  OPTION_M09, OPTION_H01 | OPTION_H09 | OPTION_M00 | OPTION_M01 },
-  { "M00",  OPTION_M00, OPTION_H01 | OPTION_H09 | OPTION_M09 | OPTION_M01 },
-  { "M02",  OPTION_M00, OPTION_H01 | OPTION_H09 | OPTION_M09 | OPTION_M01 },
-  { "M08",  OPTION_M00, OPTION_H01 | OPTION_H09 | OPTION_M09 | OPTION_M01 },
-  { "M01",  OPTION_M01, OPTION_H01 | OPTION_H09 | OPTION_M09 | OPTION_M00 },
-  { "M03",  OPTION_M01, OPTION_H01 | OPTION_H09 | OPTION_M09 | OPTION_M00 },
-  { "H01",  OPTION_H01, OPTION_H09 | OPTION_M09 | OPTION_M00 | OPTION_M01 },
-  { "H03",  OPTION_H01, OPTION_H09 | OPTION_M09 | OPTION_M00 | OPTION_M01 },
+  { "H63",  OPTION_H09, OPTION_H01 | OPTION_M09 | OPTION_M00 | OPTION_M01 | OPTION_H11 },
+  { "H09",  OPTION_H09, OPTION_H01 | OPTION_M09 | OPTION_M00 | OPTION_M01 | OPTION_H11 },
+  { "M68",  OPTION_M09, OPTION_H01 | OPTION_H09 | OPTION_M00 | OPTION_M01 | OPTION_H11 },
+  { "M09",  OPTION_M09, OPTION_H01 | OPTION_H09 | OPTION_M00 | OPTION_M01 | OPTION_H11 },
+  { "M00",  OPTION_M00, OPTION_H01 | OPTION_H09 | OPTION_M09 | OPTION_M01 | OPTION_H11 },
+  { "M02",  OPTION_M00, OPTION_H01 | OPTION_H09 | OPTION_M09 | OPTION_M01 | OPTION_H11 },
+  { "M08",  OPTION_M00, OPTION_H01 | OPTION_H09 | OPTION_M09 | OPTION_M01 | OPTION_H11 },
+  { "M01",  OPTION_M01, OPTION_H01 | OPTION_H09 | OPTION_M09 | OPTION_M00 | OPTION_H11 },
+  { "M03",  OPTION_M01, OPTION_H01 | OPTION_H09 | OPTION_M09 | OPTION_M00 | OPTION_H11 },
+  { "H01",  OPTION_H01, OPTION_H09 | OPTION_M09 | OPTION_M00 | OPTION_M01 | OPTION_H11 },
+  { "H03",  OPTION_H01, OPTION_H09 | OPTION_M09 | OPTION_M00 | OPTION_M01 | OPTION_H11 },
+  { "H11",  OPTION_H11, OPTION_H09 | OPTION_M09 | OPTION_M00 | OPTION_M01 | OPTION_H01 },
   { "TXT",  OPTION_TXT,          0 },
   { "NTX",           0, OPTION_TXT },
   { "LIS",  OPTION_LIS,          0 },
@@ -3578,6 +3836,98 @@ if (pass == 2 && unknown)
   error |= ERR_LABEL_UNDEF; 
 }
 
+void scanoperands11(struct relocrecord *pp)
+{
+char c, *s = srcptr;
+
+unknown = 0;
+opsize = 0;
+certain = 1;
+operand = 0;
+skipspace();
+c = *srcptr;
+mode = ADRMODE_IMM;
+switch (toupper(c))
+  {
+  case 'X' :                            /* "X"?                              */
+  case 'Y' :                            /* "Y"?                              */
+    scanname();
+    if (!unamebuf[1])                   /* if it's "X" or "Y" alone,         */
+      goto IdxWithout;                  /* assume it means "0,X" / "0,Y"     */
+    srcptr = s;                         /* else restore current offset       */
+    goto dodefault;                     /* and treat as label                */
+  case ',':                             /* ","?                              */
+  Indexed : 
+    srcptr++;                           /* must be followed by "X" or "Y"    */
+    if (!(dwOptions & OPTION_TSC))
+      skipspace();
+    scanname();
+    if (strcmp(unamebuf, "X") &&        /* if it's NOT "X" alone             */
+        strcmp(unamebuf, "Y"))          /* or "Y" alone                      */
+      {
+      error |= ERR_ILLEGAL_ADDR;
+      break;
+      }
+  IdxWithout :
+    if ((unsigned)operand < 256)
+      {
+      if (unamebuf[0] == 'Y')           /* prepend 0x18 page byte            */
+        {
+        int i;
+        for (i = codeptr++; i > 0; i--)
+          codebuf[i] = codebuf[i - 1];
+        codebuf[0] = 0x18;
+        }
+      mode = ADRMODE_IDX;
+      }
+    else
+      error |= ERR_ILLEGAL_ADDR;
+    break; 
+  case '#':
+    srcptr++;
+    operand = scanexpr(0, pp);
+    break;
+  case '<':
+    srcptr++;
+    if (*srcptr == '<')
+      {
+      srcptr++;
+      opsize = 1;
+      }
+    else
+      opsize = 2;
+    goto dodefault;    
+  case '>':
+    srcptr++;
+    opsize = 3;
+    /* fall thru on purpose */
+  default:
+  dodefault:
+    operand = scanexpr(0, pp);
+    if (!(dwOptions & OPTION_TSC))
+      skipspace();
+    if (*srcptr == ',')
+      goto Indexed;
+    else
+      {
+      if (opsize == 0)
+        {
+        if (unknown || !certain || 
+          (unsigned short)(operand) >= 256)
+          opsize = 3;
+        else
+          opsize = 2;
+        }  
+      if (opsize == 1)
+        opsize = 2;         
+      mode = opsize - 1;
+      }
+  }
+
+if (pass == 2 && unknown)
+  error |= ERR_LABEL_UNDEF; 
+}
+
 /*****************************************************************************/
 /* writerelhdr : writes a FLEX Relocatable Format header                     */
 /*****************************************************************************/
@@ -4632,9 +4982,46 @@ switch (mode)
     break;
   default:
     putbyte((unsigned char)(co + 0x020));
+    if ((dwOptions & OPTION_H11) &&     /* special for 68HC11 page bytes     */
+        (codebuf[0] == 0x18) &&
+        (co == 0x8c ||                  /* CPX                               */
+         co == 0xce ||                  /* LDX                               */
+         co == 0xcf))                   /* STX                               */
+      codebuf[0] = 0xcd;
     break;
  }
 doaddress(&p);
+}
+
+void darith18(int co, char noimm)
+{
+darith(co, noimm);
+if (codebuf[0] == 0xcd)
+  codebuf[0] = 0x18;
+else if (codebuf[0] != 0x18 && codebuf[0] != 0x1a)
+  {
+  int i;
+  for (i = codeptr++; i > 0; i--)
+    codebuf[i] = codebuf[i - 1];
+  if (codebuf[1] == co + 0x20)
+    codebuf[0] = 0x1A;
+  else
+    codebuf[0] = 0x18;
+  }
+}
+
+void darith1a(int co, char noimm)
+{
+darith(co, noimm);
+if (codebuf[0] == 0x18)
+  codebuf[0] = 0xCD;
+else if (codebuf[0] != 0x1a && codebuf[0] != 0xcd)
+  {
+  int i;
+  for (i = codeptr++; i > 0; i--)
+    codebuf[i] = codebuf[i - 1];
+  codebuf[0] = 0x1A;
+  }
 }
 
 /*****************************************************************************/
@@ -5045,6 +5432,125 @@ putbyte((unsigned char)((reg1 << 4) | reg2));
 }
 
 /*****************************************************************************/
+/* setmask :                                                                 */
+/*****************************************************************************/
+
+void setmask(int co)
+{
+struct relocrecord p = {0};
+long mask = -1;
+
+/* expected:
+   dir [#]mask
+   [[off],]indexreg [#]mask */
+
+scanoperands(&p);                       /* get 1st part (dir/index)          */
+
+if (*srcptr == ',' ||                   /* either , or ' ' is valid          */
+    *srcptr == ' ')
+  srcptr++;
+if (!(dwOptions & OPTION_TSC))
+  skipspace();
+if (*srcptr == '#')
+  srcptr++;
+mask = scanexpr(0, &p);
+if (mask < 0 || mask > 0xff)
+  error |= ERR_EXPR;
+
+switch (mode)
+  {
+  case ADRMODE_IMM :
+  case ADRMODE_EXT :
+    error |= ERR_ILLEGAL_ADDR;
+    break;
+  case ADRMODE_DIR :
+    putbyte((unsigned char)(co));
+    break;
+  default:
+    putbyte((unsigned char)(co + 0x08));
+    break;
+  }
+doaddress(&p);
+putbyte((unsigned char)mask);
+}
+
+/*****************************************************************************/
+/* brmask :                                                                  */
+/*****************************************************************************/
+
+void brmask(int co)
+{
+struct relocrecord p = {0}, pj = {0};
+long mask = -1;
+int offs;
+
+/* expected:
+   dir [#]mask target
+   [[off],]indexreg [#]mask target */
+
+scanoperands(&p);
+
+if (*srcptr == ',' ||                   /* either , or ' ' is valid          */
+    *srcptr == ' ')
+  srcptr++;
+if (!(dwOptions & OPTION_TSC))
+  skipspace();
+if (*srcptr == '#')
+  srcptr++;
+mask = scanexpr(0, &p);
+if (mask < 0 || mask > 0xff)
+  error |= ERR_EXPR;
+
+if (*srcptr == ',' ||                   /* either , or ' ' is valid          */
+    *srcptr == ' ')
+  srcptr++;
+if (!(dwOptions & OPTION_TSC))
+  skipspace();
+{
+char s_mode = mode;
+char s_opsize = opsize;
+long s_operand = operand;
+char s_unknown = unknown;
+char s_certain = certain;
+unsigned char s_postbyte = postbyte;
+scanoperands(&pj);
+if (mode != ADRMODE_DIR && mode != ADRMODE_EXT)
+  error |= ERR_ILLEGAL_ADDR;
+offs = (unsigned short)operand - (loccounter + phase) - 4;
+if (codeptr) offs--;
+if (!unknown && (offs < -128 || offs >= 128))
+  error |= ERR_RANGE;
+if (pass == 2 && unknown)
+  error |= ERR_LABEL_UNDEF;
+mode = s_mode;
+opsize = s_opsize;
+operand = s_operand;
+postbyte = s_postbyte;
+unknown = s_unknown;
+certain = s_certain;
+}
+
+switch (mode)
+  {
+  case ADRMODE_IMM :
+  case ADRMODE_EXT :
+    error |= ERR_ILLEGAL_ADDR;
+    break;
+  case ADRMODE_DIR :
+    putbyte((unsigned char)(co));
+    break;
+  default:
+    putbyte((unsigned char)(co + 0x0c));
+    break;
+  }
+
+doaddress(&p);
+putbyte((unsigned char)mask);
+putbyte((unsigned char)offs);
+}
+
+
+/*****************************************************************************/
 /* expandline : un-tabify current line                                       */
 /*****************************************************************************/
 
@@ -5351,6 +5857,14 @@ for (i = 0; i < (sizeof(Options) / sizeof(Options[0])); i++)
         bitregtable = bitregtable00;
         bitregtablesize = sizeof(bitregtable00) / sizeof(bitregtable00[0]);
         scanoperands = scanoperands00;
+        break;
+      case OPTION_H11 :                 /* switch to 68HC11 processor        */
+        optable = optable11;
+        optablesize = sizeof(optable11) / sizeof(optable11[0]);
+        regtable = regtable11;
+        bitregtable = bitregtable00;
+        bitregtablesize = sizeof(bitregtable00) / sizeof(bitregtable00[0]);
+        scanoperands = scanoperands11;
         break;
       }
 
@@ -6592,6 +7106,7 @@ int co;
 unsigned short cat;
 char c;
 char noimm;
+unsigned short page;
 char nomac = 0;
 
 #if 0
@@ -6680,6 +7195,11 @@ if (isValidNameChar(*srcptr, 1))        /* mnemonic or macro name            */
 
       noimm = cat & OPCAT_NOIMM;        /* isolate "no immediate possible"   */
       cat &= ~OPCAT_NOIMM;
+      if (dwOptions & OPTION_H11)       /* if in 86HC11 mode,                */
+        {                               /* isolate pageXX flag               */
+        page = cat & (OPCAT_PAGE18 | OPCAT_PAGE1A);
+        cat &= ~(OPCAT_PAGE18 | OPCAT_PAGE1A);
+        }
       if (dwOptions & OPTION_H09)       /* if in HD6309 mode,                */
         cat &= ~OPCAT_6309;             /* mask out the 6309 flag (=allow)   */
       if (dwOptions & OPTION_H01)       /* if in HD6301 mode,                */
@@ -6726,7 +7246,12 @@ if (isValidNameChar(*srcptr, 1))        /* mnemonic or macro name            */
           accarith(co, noimm, 0);
           break;
         case OPCAT_DBLREG1BYTE :
-          darith(co, noimm);
+          if ((dwOptions & OPTION_H11) && (page & OPCAT_PAGE18))
+            darith18(co, noimm);
+          else if ((dwOptions & OPTION_H11) && (page & OPCAT_PAGE1A))
+            darith1a(co, noimm);
+          else
+            darith(co, noimm);
           break;
         case OPCAT_DBLREG2BYTE :
           d2arith(co, noimm);
@@ -6760,6 +7285,12 @@ if (isValidNameChar(*srcptr, 1))        /* mnemonic or macro name            */
           break;
         case OPCAT_ACCADDR :
           accaddr(co);
+          break;
+        case OPCAT_SETMASK :            /* 68HC11 only                       */
+          setmask(co);
+          break;
+        case OPCAT_BRMASK :             /* 68HC11 only                       */
+          brmask(co);
           break;
         case OPCAT_PSEUDO :
           pseudoop(co, lp);
