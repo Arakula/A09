@@ -1751,6 +1751,15 @@ struct relocrecord reltable[MAXRELOCS]; /* relocation table (fixed size)     */
 long relhdrfoff;                        /* FLEX Relocatable Global Hdr Offset*/
 
 /*****************************************************************************/
+/* operandrecord structure definition                                        */
+/*****************************************************************************/
+
+struct operandrecord
+  {
+  struct relocrecord p;                 /* possible relocation record        */
+  };
+
+/*****************************************************************************/
 /* Options definitions                                                       */
 /*****************************************************************************/
 
@@ -3871,12 +3880,25 @@ switch (toupper(c))
   IdxWithout :
     if ((unsigned)operand < 256)
       {
-      if (unamebuf[0] == 'Y')           /* prepend 0x18 page byte            */
+      if (unamebuf[0] == 'X')           /* page byte processing for X        */
         {
-        int i;
-        for (i = codeptr++; i > 0; i--)
-          codebuf[i] = codebuf[i - 1];
-        codebuf[0] = 0x18;
+        if (codeptr)
+          {
+          if (codebuf[0] == 0x18)
+            codebuf[0] = 0x1a;
+          }
+        }
+      else if (unamebuf[0] == 'Y')      /* page byte processing for Y        */
+        {
+        if (!codeptr)
+          {
+          int i;
+          for (i = codeptr++; i > 0; i--)
+            codebuf[i] = codebuf[i - 1];
+          codebuf[0] = 0x18;
+          }
+        else if (codebuf[0] == 0x1a)
+          codebuf[0] = 0xcd;
         }
       mode = ADRMODE_IDX;
       }
@@ -4982,12 +5004,14 @@ switch (mode)
     break;
   default:
     putbyte((unsigned char)(co + 0x020));
-    if ((dwOptions & OPTION_H11) &&     /* special for 68HC11 page bytes     */
-        (codebuf[0] == 0x18) &&
-        (co == 0x8c ||                  /* CPX                               */
-         co == 0xce ||                  /* LDX                               */
-         co == 0xcf))                   /* STX                               */
-      codebuf[0] = 0xcd;
+    if (dwOptions & OPTION_H11)         /* specials for 68HC11 page bytes    */
+      {
+      if ((codebuf[0] == 0x18) &&
+          (co == 0x8c ||                /* CPX                               */
+           co == 0xce ||                /* LDX                               */
+           co == 0xcf))                 /* STX                               */
+        codebuf[0] = 0xcd;
+      }
     break;
  }
 doaddress(&p);
@@ -4995,33 +5019,16 @@ doaddress(&p);
 
 void darith18(int co, char noimm)
 {
+codebuf[codeptr++] = 0x18;
 darith(co, noimm);
 if (codebuf[0] == 0xcd)
   codebuf[0] = 0x18;
-else if (codebuf[0] != 0x18 && codebuf[0] != 0x1a)
-  {
-  int i;
-  for (i = codeptr++; i > 0; i--)
-    codebuf[i] = codebuf[i - 1];
-  if (codebuf[1] == co + 0x20)
-    codebuf[0] = 0x1A;
-  else
-    codebuf[0] = 0x18;
-  }
 }
 
 void darith1a(int co, char noimm)
 {
+codebuf[codeptr++] = 0x1a;
 darith(co, noimm);
-if (codebuf[0] == 0x18)
-  codebuf[0] = 0xCD;
-else if (codebuf[0] != 0x1a && codebuf[0] != 0xcd)
-  {
-  int i;
-  for (i = codeptr++; i > 0; i--)
-    codebuf[i] = codebuf[i - 1];
-  codebuf[0] = 0x1A;
-  }
 }
 
 /*****************************************************************************/
