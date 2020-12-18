@@ -1790,6 +1790,7 @@ struct operandrecord
 #define OPTION_LPA    0x01000000L       /* listing in f9dasm patch format    */
 #define OPTION_DLM    0x02000000L       /* define label on macro expansion   */
 #define OPTION_H11    0x04000000L       /* 68HC11 mode                       */
+#define OPTION_RED    0x08000000L       /* redefine label if code label, too */
 
 struct
   {
@@ -1852,6 +1853,8 @@ struct
   { "NLP",           0, OPTION_LPA },
   { "DLM",  OPTION_DLM,          0 },
   { "NDL",           0, OPTION_DLM },
+  { "RED",  OPTION_RED,          0 },
+  { "NRD",           0, OPTION_RED },
   };
 
 unsigned long dwOptions =               /* options flags, init to default:   */
@@ -4606,6 +4609,13 @@ if (lp)
     ;
   else if (lp->cat != SYMCAT_EMPTY && lp->cat != SYMCAT_UNRESOLVED)
     {
+    if (dwOptions & OPTION_RED)
+      {
+      /* if existing constant value equals the current location, let it through */
+      if (lp->cat == SYMCAT_CONSTANT &&
+          lp->value == (unsigned short)(loccounter + phase))
+        lp->cat = (global) ? SYMCAT_PUBLIC : SYMCAT_LABEL;
+      }
     if ((lp->cat != SYMCAT_LABEL && lp->cat != SYMCAT_PUBLIC) ||
         lp->value != (unsigned short)(loccounter + phase))
       error |= ERR_LABEL_MULT;
