@@ -77,6 +77,7 @@
     name
     symlen
     bin, binary includes a binary file at the current position
+    pemt       emit patch data if option LPA is set
 
    recognized options:
      On | Off         Meaning
@@ -105,6 +106,8 @@
     TXT | NTX*        Print text table
     LPA | LNP*        Listing in f9dasm patch format
     DLM | NDL*        Define label on macro expansion
+    RED | NRD*        
+    FBG*| NFB         Fill gaps in binary output files
     * denotes default value
 
     
@@ -272,6 +275,14 @@
                        thanks to Ray Bellis for pointing that out. See
                          https://github.com/Arakula/A09/issues/9
                        for details.
+   v1.45 2020-12-18 Motorola 68HC11 mode added
+                    RED|NRD* option added
+   v1.46 2021-01-15 FBG*|NFB option added
+   v1.47 2021-02-22 LPA option cleanups
+                    PEMT pseudo-opt added
+   v1.48 2021-02-22 additional PEMT capabilities
+                    ASLD,ASRD,CLRD,DECD,INCD,LSLD,LSRD convenience mnemonics added
+                    to all 6800-based assemblers
 
 */
 
@@ -302,8 +313,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.45"
-#define VERSNUM      "$012D"            /* can be queried as &VERSION        */
+#define VERSION      "1.48"
+#define VERSNUM      "$0130"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -446,10 +457,11 @@ struct oprecord
 #define PSEUDO_DEPHASE       46
 #define PSEUDO_FCQ           47
 #define PSEUDO_FILL          48
+#define PSEUDO_PEMT          49
 
 struct oprecord optable09[]=
   {
-  { "ABA",     OPCAT_FOURBYTE,    0x3404abe0 },
+  { "ABA",     OPCAT_FOURBYTE,    0x3404abe0 },  // PSHB ADDA,S+
   { "ABS",     OPCAT_PSEUDO,      PSEUDO_ABS },
   { "ABX",     OPCAT_ONEBYTE,     0x3a },
   { "ABY",     OPCAT_TWOBYTE,     0x31a5 },
@@ -485,13 +497,13 @@ struct oprecord optable09[]=
   { "ASL",     OPCAT_SINGLEADDR,  0x08 },
   { "ASLA",    OPCAT_ONEBYTE,     0x48 },
   { "ASLB",    OPCAT_ONEBYTE,     0x58 },
-  { "ASLD",    OPCAT_TWOBYTE,     0x5849 },
+  { "ASLD",    OPCAT_TWOBYTE,     0x5849 },  // ASLB ROLA
   { "ASLD63",  OPCAT_6309 |
                OPCAT_TWOBYTE,     0x1048 },
   { "ASR",     OPCAT_SINGLEADDR,  0x07 },
   { "ASRA",    OPCAT_ONEBYTE,     0x47 },
   { "ASRB",    OPCAT_ONEBYTE,     0x57 },
-  { "ASRD",    OPCAT_TWOBYTE,     0x4756 },
+  { "ASRD",    OPCAT_TWOBYTE,     0x4756 },  // ASRA RORB
   { "ASRD63",  OPCAT_6309 |
                OPCAT_TWOBYTE,     0x1047 },
   { "BAND",    OPCAT_6309 |
@@ -545,7 +557,7 @@ struct oprecord optable09[]=
   { "CLR",     OPCAT_SINGLEADDR,  0x0f },
   { "CLRA",    OPCAT_ONEBYTE,     0x4f },
   { "CLRB",    OPCAT_ONEBYTE,     0x5f },
-  { "CLRD",    OPCAT_TWOBYTE,     0x4f5f },
+  { "CLRD",    OPCAT_TWOBYTE,     0x4f5f },  // CLRA CLRB
   { "CLRD63",  OPCAT_6309 |
                OPCAT_TWOBYTE,     0x104f },
   { "CLRE",    OPCAT_6309 |
@@ -592,7 +604,7 @@ struct oprecord optable09[]=
   { "DEC",     OPCAT_SINGLEADDR,  0x0a },
   { "DECA",    OPCAT_ONEBYTE,     0x4a },
   { "DECB",    OPCAT_ONEBYTE,     0x5a },
-  { "DECD",    OPCAT_THREEBYTE,   0x830001 },
+  { "DECD",    OPCAT_THREEBYTE,   0x830001 },  // SUBD #1
   { "DECD63",  OPCAT_6309 |
                OPCAT_TWOBYTE,     0x104a },
   { "DECE",    OPCAT_6309 |
@@ -654,7 +666,7 @@ struct oprecord optable09[]=
   { "INC",     OPCAT_SINGLEADDR,  0x0c },
   { "INCA",    OPCAT_ONEBYTE,     0x4c },
   { "INCB",    OPCAT_ONEBYTE,     0x5c },
-  { "INCD",    OPCAT_THREEBYTE,   0xc30001 },
+  { "INCD",    OPCAT_THREEBYTE,   0xc30001 },  // ADDD 1
   { "INCD63",  OPCAT_6309 |
                OPCAT_TWOBYTE,     0x104c },
   { "INCE",    OPCAT_6309 |
@@ -723,13 +735,13 @@ struct oprecord optable09[]=
   { "LSL",     OPCAT_SINGLEADDR,  0x08 },
   { "LSLA",    OPCAT_ONEBYTE,     0x48 },
   { "LSLB",    OPCAT_ONEBYTE,     0x58 },
-  { "LSLD",    OPCAT_TWOBYTE,     0x5849 },
+  { "LSLD",    OPCAT_TWOBYTE,     0x5849 },  // LSLB ROLA
   { "LSLD63",  OPCAT_6309 |
                OPCAT_TWOBYTE,     0x1048 },
   { "LSR",     OPCAT_SINGLEADDR,  0x04 },
   { "LSRA",    OPCAT_ONEBYTE,     0x44 },
   { "LSRB",    OPCAT_ONEBYTE,     0x54 },
-  { "LSRD",    OPCAT_TWOBYTE,     0x4456 },
+  { "LSRD",    OPCAT_TWOBYTE,     0x4456 },  // LSRA RORB
   { "LSRD63",  OPCAT_6309 |
                OPCAT_TWOBYTE,     0x1044 },
   { "LSRW",    OPCAT_6309 |
@@ -762,6 +774,7 @@ struct oprecord optable09[]=
                OPCAT_IREG,        0x1035 },
   { "PAG",     OPCAT_PSEUDO,      PSEUDO_PAG },
   { "PAGE",    OPCAT_PSEUDO,      PSEUDO_PAG },
+  { "PEMT",    OPCAT_PSEUDO,      PSEUDO_PEMT },
   { "PHASE",   OPCAT_PSEUDO,      PSEUDO_PHASE },
   { "PSH",     OPCAT_STACK,       0x34 },
   { "PSHA",    OPCAT_TWOBYTE,     0x3402 },
@@ -933,9 +946,11 @@ struct oprecord optable00[]=
   { "ASL",     OPCAT_ACCADDR,     0x08 },
   { "ASLA",    OPCAT_ONEBYTE,     0x48 },
   { "ASLB",    OPCAT_ONEBYTE,     0x58 },
+  { "ASLD",    OPCAT_TWOBYTE,     0x5849 },  // ASLB ROLA
   { "ASR",     OPCAT_ACCADDR,     0x07 },
   { "ASRA",    OPCAT_ONEBYTE,     0x47 },
   { "ASRB",    OPCAT_ONEBYTE,     0x57 },
+  { "ASRD",    OPCAT_TWOBYTE,     0x4756 },  // ASRA RORB
   { "BCC",     OPCAT_SBRANCH,     0x24 },
   { "BCS",     OPCAT_SBRANCH,     0x25 },
   { "BEC",     OPCAT_SBRANCH,     0x24 },
@@ -968,6 +983,7 @@ struct oprecord optable00[]=
   { "CLR",     OPCAT_ACCADDR,     0x0f },
   { "CLRA",    OPCAT_ONEBYTE,     0x4f },
   { "CLRB",    OPCAT_ONEBYTE,     0x5f },
+  { "CLRD",    OPCAT_TWOBYTE,     0x4f5f },  // CLRA CLRB
   { "CLV",     OPCAT_ONEBYTE,     0x0a },
   { "CMP",     OPCAT_ACCARITH,    0x81 },
   { "CMPA",    OPCAT_ARITH,       0x81 },
@@ -980,6 +996,7 @@ struct oprecord optable00[]=
   { "DEC",     OPCAT_ACCADDR,     0x0a },
   { "DECA",    OPCAT_ONEBYTE,     0x4a },
   { "DECB",    OPCAT_ONEBYTE,     0x5a },
+  { "DECD",    OPCAT_FOURBYTE,    0xc0018200 },  // SUBB#1 SBCA#0
   { "DEF",     OPCAT_PSEUDO,      PSEUDO_DEF },
   { "DEFINE",  OPCAT_PSEUDO,      PSEUDO_DEF },
   { "DEPHASE", OPCAT_PSEUDO,      PSEUDO_DEPHASE },
@@ -1016,6 +1033,7 @@ struct oprecord optable00[]=
   { "INC",     OPCAT_ACCADDR,     0x0c },
   { "INCA",    OPCAT_ONEBYTE,     0x4c },
   { "INCB",    OPCAT_ONEBYTE,     0x5c },
+  { "INCD",    OPCAT_FOURBYTE,    0xcb018900 },  // ADDB#1 ADCA#0
   { "INCLUDE", OPCAT_PSEUDO,      PSEUDO_INCLUDE },
   { "INS",     OPCAT_ONEBYTE,     0x31 },
   { "INX",     OPCAT_ONEBYTE,     0x08 },
@@ -1032,9 +1050,11 @@ struct oprecord optable00[]=
   { "LSL",     OPCAT_ACCADDR,     0x08 },
   { "LSLA",    OPCAT_ONEBYTE,     0x48 },
   { "LSLB",    OPCAT_ONEBYTE,     0x58 },
+  { "LSLD",    OPCAT_TWOBYTE,     0x5849 },  // LSLB ROLA
   { "LSR",     OPCAT_ACCADDR,     0x04 },
   { "LSRA",    OPCAT_ONEBYTE,     0x44 },
   { "LSRB",    OPCAT_ONEBYTE,     0x54 },
+  { "LSRD",    OPCAT_TWOBYTE,     0x4456 },  // LSRA RORB
   { "MACRO",   OPCAT_PSEUDO,      PSEUDO_MACRO },
   { "NAM",     OPCAT_PSEUDO,      PSEUDO_NAM },
   { "NAME",    OPCAT_PSEUDO,      PSEUDO_NAME },
@@ -1051,6 +1071,7 @@ struct oprecord optable00[]=
   { "ORG",     OPCAT_PSEUDO,      PSEUDO_ORG },
   { "PAG",     OPCAT_PSEUDO,      PSEUDO_PAG },
   { "PAGE",    OPCAT_PSEUDO,      PSEUDO_PAG },
+  { "PEMT",    OPCAT_PSEUDO,      PSEUDO_PEMT },
   { "PHASE",   OPCAT_PSEUDO,      PSEUDO_PHASE },
   { "PSHA",    OPCAT_ONEBYTE,     0x36 },
   { "PSHB",    OPCAT_ONEBYTE,     0x37 },
@@ -1140,6 +1161,7 @@ struct oprecord optable01[]=
   { "ASR",     OPCAT_ACCADDR,     0x07 },
   { "ASRA",    OPCAT_ONEBYTE,     0x47 },
   { "ASRB",    OPCAT_ONEBYTE,     0x57 },
+  { "ASRD",    OPCAT_TWOBYTE,     0x4756 },  // ASRA RORB
   { "BCC",     OPCAT_SBRANCH,     0x24 },
   { "BCS",     OPCAT_SBRANCH,     0x25 },
   { "BEC",     OPCAT_SBRANCH,     0x24 },
@@ -1173,6 +1195,7 @@ struct oprecord optable01[]=
   { "CLR",     OPCAT_ACCADDR,     0x0f },
   { "CLRA",    OPCAT_ONEBYTE,     0x4f },
   { "CLRB",    OPCAT_ONEBYTE,     0x5f },
+  { "CLRD",    OPCAT_TWOBYTE,     0x4f5f },  // CLRA CLRB
   { "CLV",     OPCAT_ONEBYTE,     0x0a },
   { "CMP",     OPCAT_ACCARITH,    0x81 },
   { "CMPA",    OPCAT_ARITH,       0x81 },
@@ -1185,6 +1208,7 @@ struct oprecord optable01[]=
   { "DEC",     OPCAT_ACCADDR,     0x0a },
   { "DECA",    OPCAT_ONEBYTE,     0x4a },
   { "DECB",    OPCAT_ONEBYTE,     0x5a },
+  { "DECD",    OPCAT_FOURBYTE,    0xc0018200 },  // SUBB#1 SBCA#0
   { "DEF",     OPCAT_PSEUDO,      PSEUDO_DEF },
   { "DEFINE",  OPCAT_PSEUDO,      PSEUDO_DEF },
   { "DEPHASE", OPCAT_PSEUDO,      PSEUDO_DEPHASE },
@@ -1223,6 +1247,7 @@ struct oprecord optable01[]=
   { "INC",     OPCAT_ACCADDR,     0x0c },
   { "INCA",    OPCAT_ONEBYTE,     0x4c },
   { "INCB",    OPCAT_ONEBYTE,     0x5c },
+  { "INCD",    OPCAT_FOURBYTE,    0xcb018900 },  // ADDB#1 ADCA#0
   { "INCLUDE", OPCAT_PSEUDO,      PSEUDO_INCLUDE },
   { "INS",     OPCAT_ONEBYTE,     0x31 },
   { "INX",     OPCAT_ONEBYTE,     0x08 },
@@ -1241,6 +1266,7 @@ struct oprecord optable01[]=
   { "LSL",     OPCAT_ACCADDR,     0x08 },
   { "LSLA",    OPCAT_ONEBYTE,     0x48 },
   { "LSLB",    OPCAT_ONEBYTE,     0x58 },
+  { "LSLD",    OPCAT_TWOBYTE,     0x05 },
   { "LSR",     OPCAT_ACCADDR,     0x04 },
   { "LSRA",    OPCAT_ONEBYTE,     0x44 },
   { "LSRB",    OPCAT_ONEBYTE,     0x54 },
@@ -1264,6 +1290,7 @@ struct oprecord optable01[]=
   { "ORG",     OPCAT_PSEUDO,      PSEUDO_ORG },
   { "PAG",     OPCAT_PSEUDO,      PSEUDO_PAG },
   { "PAGE",    OPCAT_PSEUDO,      PSEUDO_PAG },
+  { "PEMT",    OPCAT_PSEUDO,      PSEUDO_PEMT },
   { "PHASE",   OPCAT_PSEUDO,      PSEUDO_PHASE },
   { "PSHA",    OPCAT_ONEBYTE,     0x36 },
   { "PSHB",    OPCAT_ONEBYTE,     0x37 },
@@ -1363,6 +1390,7 @@ struct oprecord optable11[]=
   { "ASR",     OPCAT_ACCADDR,     0x07 },
   { "ASRA",    OPCAT_ONEBYTE,     0x47 },
   { "ASRB",    OPCAT_ONEBYTE,     0x57 },
+  { "ASRD",    OPCAT_TWOBYTE,     0x4756 },  // ASRA RORB
   { "BCC",     OPCAT_SBRANCH,     0x24 },
   { "BCLR",    OPCAT_SETMASK,     0x15 },
   { "BCS",     OPCAT_SBRANCH,     0x25 },
@@ -1401,6 +1429,7 @@ struct oprecord optable11[]=
   { "CLR",     OPCAT_ACCADDR,     0x0f },
   { "CLRA",    OPCAT_ONEBYTE,     0x4f },
   { "CLRB",    OPCAT_ONEBYTE,     0x5f },
+  { "CLRD",    OPCAT_TWOBYTE,     0x4f5f },  // CLRA CLRB
   { "CLV",     OPCAT_ONEBYTE,     0x0a },
   { "CMP",     OPCAT_ACCARITH,    0x81 },
   { "CMPA",    OPCAT_ARITH,       0x81 },
@@ -1417,6 +1446,7 @@ struct oprecord optable11[]=
   { "DEC",     OPCAT_ACCADDR,     0x0a },
   { "DECA",    OPCAT_ONEBYTE,     0x4a },
   { "DECB",    OPCAT_ONEBYTE,     0x5a },
+  { "DECD",    OPCAT_FOURBYTE,    0xc0018200 },  // SUBB#1 SBCA#0
   { "DEF",     OPCAT_PSEUDO,      PSEUDO_DEF },
   { "DEFINE",  OPCAT_PSEUDO,      PSEUDO_DEF },
   { "DEPHASE", OPCAT_PSEUDO,      PSEUDO_DEPHASE },
@@ -1456,6 +1486,7 @@ struct oprecord optable11[]=
   { "INC",     OPCAT_ACCADDR,     0x0c },
   { "INCA",    OPCAT_ONEBYTE,     0x4c },
   { "INCB",    OPCAT_ONEBYTE,     0x5c },
+  { "INCD",    OPCAT_FOURBYTE,    0xcb018900 },  // ADDB#1 ADCA#0
   { "INCLUDE", OPCAT_PSEUDO,      PSEUDO_INCLUDE },
   { "INS",     OPCAT_ONEBYTE,     0x31 },
   { "INX",     OPCAT_ONEBYTE,     0x08 },
@@ -1499,6 +1530,7 @@ struct oprecord optable11[]=
   { "ORG",     OPCAT_PSEUDO,      PSEUDO_ORG },
   { "PAG",     OPCAT_PSEUDO,      PSEUDO_PAG },
   { "PAGE",    OPCAT_PSEUDO,      PSEUDO_PAG },
+  { "PEMT",    OPCAT_PSEUDO,      PSEUDO_PEMT },
   { "PHASE",   OPCAT_PSEUDO,      PSEUDO_PHASE },
   { "PSHA",    OPCAT_ONEBYTE,     0x36 },
   { "PSHB",    OPCAT_ONEBYTE,     0x37 },
@@ -1791,6 +1823,7 @@ struct operandrecord
 #define OPTION_DLM    0x02000000L       /* define label on macro expansion   */
 #define OPTION_H11    0x04000000L       /* 68HC11 mode                       */
 #define OPTION_RED    0x08000000L       /* redefine label if code label, too */
+#define OPTION_FBG    0x10000000L       /* fill binary gaps                  */
 
 struct
   {
@@ -1849,12 +1882,15 @@ struct
   { "NTX",           0, OPTION_TXT },
   { "LIS",  OPTION_LIS,          0 },
   { "NOL",           0, OPTION_LIS },
-  { "LPA",  OPTION_LPA, OPTION_NUM | OPTION_CLL }, // LPA inhibits NUM / CLL!
+  { "LPA",  OPTION_LPA | OPTION_EXP | OPTION_LLL,  // LPA enforces EXP / LLL
+                        OPTION_NUM | OPTION_CLL }, // LPA inhibits NUM / CLL
   { "NLP",           0, OPTION_LPA },
   { "DLM",  OPTION_DLM,          0 },
   { "NDL",           0, OPTION_DLM },
   { "RED",  OPTION_RED,          0 },
   { "NRD",           0, OPTION_RED },
+  { "FBG",  OPTION_FBG,          0 },
+  { "NFB",           0, OPTION_FBG },
   };
 
 unsigned long dwOptions =               /* options flags, init to default:   */
@@ -1867,6 +1903,7 @@ unsigned long dwOptions =               /* options flags, init to default:   */
     OPTION_CLL |                        /* check line length                 */
     OPTION_LLL |                        /* list library lines                */
     OPTION_REL |                        /* print relocation table            */
+    OPTION_FBG |                        /* fill gaps in binary output        */
     OPTION_LIS;                         /* print assembler output listing    */
 
 /*****************************************************************************/
@@ -2750,7 +2787,7 @@ if (dwOptions & OPTION_PAG)             /* if pagination active,             */
 else
   putlist("\n");
 
-putlist("SYMBOL TABLE");
+putlist("%sSYMBOL TABLE", (dwOptions & OPTION_LPA) ? "* " : "");
 for (i = 0; i < symcounter; i++) 
   if (symtable[i].cat != SYMCAT_EMPTY)
     {
@@ -2766,7 +2803,7 @@ for (i = 0; i < symcounter; i++)
         if (!strcmp(lcltable[k].name, symtable[i].name))
           {
           if (j % 4 == 0)
-            putlist("\n");
+            putlist("\n%s", (dwOptions & OPTION_LPA) ? "* " : "");
           putlist( " %9s %02d %04X", lcltable[k].name, lcltable[k].cat,
                                      lcltable[k].value); 
           j++;
@@ -2775,13 +2812,13 @@ for (i = 0; i < symcounter; i++)
     else                                /* if normal label                   */
       {
       if (j % 4 == 0)
-        putlist("\n");
+        putlist("\n%s", (dwOptions & OPTION_LPA) ? "* " : "");
       putlist( " %9s %02d %04X", symtable[i].name,symtable[i].cat,
                                  symtable[i].value); 
       j++;
       }
     }
-putlist("\n%d SYMBOLS\n", j);
+putlist("\n%s%d SYMBOLS\n", (dwOptions & OPTION_LPA) ? "* " : "", j);
 } 
 
 /*****************************************************************************/
@@ -2800,7 +2837,7 @@ if (dwOptions & OPTION_PAG)             /* if pagination active,             */
 else
   putlist("\n");
 
-putlist("RELOCATION TABLE");
+putlist("%sRELOCATION TABLE", (dwOptions & OPTION_LPA) ? "* " : "");
 for (i = 0; i < relcounter; i++) 
   {
   char name[10];
@@ -2808,14 +2845,14 @@ for (i = 0; i < relcounter; i++)
           (reltable[i].exprcat & EXPRCAT_NEGATIVE) ? '-' : ' ',
           reltable[i].sym->name);
   if (j % 4 == 0)
-    putlist("\n");
+    putlist("\n%s", (dwOptions & OPTION_LPA) ? "* " : "");
   putlist( " %9s %02d %04X",
            name,
            reltable[i].sym->cat,
            reltable[i].addr);
   j++;
   }
-putlist("\n%d RELOCATIONS\n", j);
+putlist("\n%s%d RELOCATIONS\n", (dwOptions & OPTION_LPA) ? "* " : "", j);
 } 
 
 /*****************************************************************************/
@@ -2834,17 +2871,18 @@ if (dwOptions & OPTION_PAG)             /* if pagination active,             */
 else
   putlist("\n");
 
-putlist("TEXT TABLE");
+putlist("%sTEXT TABLE", (dwOptions & OPTION_LPA) ? "* " : "");
 for (i = 0; i < symcounter; i++) 
   if (symtable[i].cat == SYMCAT_TEXT)
     {
                                         /* suppress listing of predef texts  */
     if (symtable[i].value < nPredefinedTexts)
       continue;
-    putlist("\n %9s %s", symtable[i].name, texts[symtable[i].value]); 
+    putlist("\n%s %9s %s", (dwOptions & OPTION_LPA) ? "* " : "",
+            symtable[i].name, texts[symtable[i].value]); 
     j++;
     }
-putlist("\n%d TEXTS\n", j);
+putlist("\n%s%d TEXTS\n", (dwOptions & OPTION_LPA) ? "* " : "", j);
 } 
 
 /*****************************************************************************/
@@ -4439,7 +4477,8 @@ if ((condline) &&                       /* if this is a condition line       */
 if (dwOptions & OPTION_NUM)             /* if number output                  */
   putlist("%4d ", curline->ln);         /* print out the line number         */
 
-if (!absmode)                           /* if in relocating assembler mode   */
+if (!absmode &&                         /* if in relocating assembler mode   */
+    !(dwOptions & OPTION_LPA))
   putlist("%c", curline->rel);          /* output relocation information     */
 
 if (dwOptions & OPTION_LPA)             /* if in patch mode                  */
@@ -4453,7 +4492,9 @@ if (dwOptions & OPTION_LPA)             /* if in patch mode                  */
           putlist("setdp %04X %02X\n", loccounter, dpsetting);
         break;
       case PSEUDO_ORG :
-        putlist("insert %04X \\        ORG $%04X\n", loccounter, loccounter);
+#if 0
+        putlist("insert %04X \\        ORG     $%04X\n", loccounter, loccounter);
+#endif
         break;
       case PSEUDO_RZB :
       case PSEUDO_FILL :
@@ -4478,6 +4519,56 @@ if (dwOptions & OPTION_LPA)             /* if in patch mode                  */
           putlist("-%04X", oldlc + codeptr - 1);
         putlist("\n");
         break;
+      case PSEUDO_PEMT :
+        {
+        char lBsl = 0;
+        int lP = -1, rP = -1;
+        /* Specials: 
+           - '*' means "current address", unless prefixed with '\\'
+           - '@(...)' means "evaluate the expression with scanexpr() and
+             use the result as a numerical value", unless prefixed with '\\'
+        */
+        for (i = 0; szBuf1[i]; i++)
+          {
+          if (szBuf1[i] == '*' && !lBsl)
+            putlist("%04X", oldlc);
+          else if (szBuf1[i] == '@' && szBuf1[i + 1] == '(' && !lBsl)
+            {
+            int j, lP = 1;
+            for (j = i + 2; szBuf1[j]; j++)
+              {
+              if (szBuf1[j] == '(')
+                lP++;
+              else if (szBuf1[j] == ')')
+                {
+                lP--;
+                if (!lP)
+                  break;
+                }
+              }
+            /* OK, we're either on EOL or closing ) */
+            if (j > i + 2)
+              {
+              char *osp = srcptr;
+              long l;
+              struct relocrecord pp = {0};
+              memcpy(szBuf2, szBuf1 + i + 2, (size_t)j - i - 1);
+              szBuf2[j - i - 2] = '\0';
+              srcptr = szBuf2;
+              l = scanexpr(0, &pp);
+              // garbage in, garbage out ...
+              putlist("%04X", l);
+              srcptr = osp;
+              }
+            i = j;
+            }
+          else
+            putlist("%c", szBuf1[i]);
+          lBsl = (szBuf1[i] == '\\');
+          }
+        putlist("\n");
+        }
+        break;
       }
     }
   if (codeptr > 0)                      /* if there are code bytes           */
@@ -4489,8 +4580,10 @@ if (dwOptions & OPTION_LPA)             /* if in patch mode                  */
     }
   else if (*curline->txt)
     putlist("      ");
+#if 0
   else
     putlist("comment %04X", oldlc);
+#endif
   }
 else if ((warning & WRN_OPT) &&         /* excessive branch, TSC style       */
     (dwOptions & OPTION_TSC) &&         
@@ -4543,6 +4636,54 @@ else                                    /* otherwise                         */
   putlist("%s", srcline);               /* print possibly expanded line      */
 
 putlist("\n");                          /* send newline                      */
+
+#if 0
+/* that is ... too much. PEMT is more tedious, but gives finer control. */
+if ((dwOptions & OPTION_LPA) &&         /* patch output - check for comments */
+    (*curline->txt))
+  {
+  char nonblnk = 0;
+  int bef = 0;
+  int fnd = -1;
+  for (i = 0; curline->txt[i]; i++)
+    {
+    char c = curline->txt[i];
+    if ((c == '*') ||
+        ((dwOptions & OPTION_GAS) && (c == '|')) ||
+        (c == ';'))
+      {
+      fnd = ++i;
+      if (isspace(curline->txt[fnd]))
+        fnd++;
+      break;
+      }
+    else if (isspace(c))
+      {
+      if (!nonblnk)
+        bef++;
+      }
+    else
+      nonblnk = 1;
+    }
+  if (fnd > 0 && curline->txt[fnd])
+    {
+    if (nonblnk || bef > 2)
+      putlist("lcomment %04X ", oldlc);
+    else
+      putlist("comment %04X ", oldlc);
+    if (isspace(curline->txt[fnd]))
+      putlist("\\");
+    for ( ; curline->txt[fnd]; fnd++)
+      {
+      char c = curline->txt[fnd];
+      if (c == '*')
+        putlist("\\");
+      putlist("%c", c);
+      }
+    putlist("\n");
+    }
+  }
+#endif
 
 if (codeptr > MAXLISTBYTES &&           /* if there are additional bytes,    */
     (dwOptions & (OPTION_LPA | OPTION_MUL)))
@@ -6309,15 +6450,16 @@ switch (co)
               {
               if (i < avbytes)
                 fseek(objfile, 1, SEEK_CUR);
-              else
+              else if (dwOptions & OPTION_FBG)
                 fputc(rmbfillchr, objfile);
               }
             }
           else                          /* if backward gap                   */
             {
             j = -j;
-            for (i = 0; i < j; i++)     /* seek back that many bytes         */
-              fseek(objfile, -1, SEEK_CUR);
+            if (dwOptions & OPTION_FBG) /* and we're filling gaps,           */
+              for (i = 0; i < j; i++)   /* seek back that many bytes         */
+                fseek(objfile, -1, SEEK_CUR);
             }
           break;
         case OUT_SREC :                 /* motorola s51-09                   */
@@ -6728,6 +6870,28 @@ switch (co)
   case PSEUDO_DEPHASE :                 /* DEPHASE ?                         */
     /* end last PHASE */
     phase = 0;
+    break;
+  case PSEUDO_PEMT :                    /* PEMT <text>                       */
+    nRepNext = 0;                       /* reset eventual repeat             */
+    skipspace();
+    if (isalnum(*srcptr))
+      {
+      char *tgt = szBuf1;
+      char *lnblnk = tgt;
+      int nBytes = 0;
+      while (*srcptr && nBytes < (sizeof(szBuf1) - 1))
+        {
+        if (*srcptr != ' ')
+          lnblnk = tgt;
+        *tgt++ = *srcptr++;
+        nBytes++;
+        }
+      lnblnk[1] = '\0';                 /* terminate after last nonblank     */
+      while (*srcptr)                   /* skip rest if too long             */
+        srcptr++;
+      if (!(dwOptions & OPTION_LPA))
+        curline->lvl |= LINCAT_INVISIBLE;
+      }
     break;
   }
 }
@@ -7729,15 +7893,17 @@ if (errors)
   {
   printf("%ld error(s) in pass 1\n",errors);
   if ((listing & LIST_ON) && (dwOptions & OPTION_LP1))
-    putlist( "%ld error(s) in pass 1.\n", errors);
+    putlist("%s%ld error(s) in pass 1.\n",
+            (dwOptions & OPTION_LPA) ? "* " : "", errors);
   nTotErrors = errors;
   }
 if (warnings)
   {
   printf("%ld warning(s) in pass 1\n", warnings);
   if ((listing & LIST_ON) && (dwOptions & OPTION_LP1))
-    putlist(
-            "%ld warning(s) in pass 1.\n", warnings);
+    putlist("%s%ld warning(s) in pass 1.\n",
+            (dwOptions & OPTION_LPA) ? "* " : "",
+            warnings);
   nTotWarnings = warnings;
   }
 
@@ -7766,7 +7932,8 @@ if (listing & LIST_ON)
     putlist( "*** Pass 2 ***\n\n");
     }
   else if (nTotErrors || nTotWarnings)
-    putlist( "%ld error(s), %ld warning(s) unlisted in pass 1\n",
+    putlist("%s%ld error(s), %ld warning(s) unlisted in pass 1\n",
+            (dwOptions & OPTION_LPA) ? "* " : "",
             nTotErrors, nTotWarnings);
   }
 
@@ -7806,9 +7973,11 @@ if (listing & LIST_ON)
   if (errors || warnings)
     putlist("\n");
   if (errors)
-    putlist( "%ld error(s) in pass 2.\n", errors);
+    putlist("%s%ld error(s) in pass 2.\n",
+            (dwOptions & OPTION_LPA) ? "* " : "", errors);
   if (warnings)
-    putlist( "%ld warning(s) in pass 2.\n", warnings);
+    putlist("%s%ld warning(s) in pass 2.\n",
+            (dwOptions & OPTION_LPA) ? "* " : "", warnings);
   if (dwOptions & OPTION_SYM)
     outsymtable();
   if ((relocatable) && (dwOptions & OPTION_REL))
@@ -7817,8 +7986,8 @@ if (listing & LIST_ON)
       (nPredefinedTexts < nTexts))
     outtexttable();
 
-  putlist( "\n%ld error(s), %ld warning(s)\n",
-          nTotErrors, nTotWarnings);
+  putlist( "\n%s%ld error(s), %ld warning(s)\n",
+          (dwOptions & OPTION_LPA) ? "* " : "", nTotErrors, nTotWarnings);
   fclose(listfile);
   }
 else

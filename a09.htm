@@ -295,6 +295,25 @@ available in A09 (* denotes the default value for a mutually exclusive set):</p>
     <td valign="top"><b>NDL *</b></td>
     <td>do not define labels on macro expansion</td>
   </tr>
+  <tr bgcolor="#f0f0f0">
+    <td valign="top"><b>RED</b></td>
+    <td>allow redefinition of EQU statements to code/data labels <i>if</i> the value stays the same</td>
+  </tr>
+  <tr bgcolor="#f0f0f0">
+    <td valign="top"><b>NRD *</b></td>
+    <td>do not allow redefinition of EQU statements to code/data labels</td>
+  </tr>
+  <tr>
+    <td valign="top"><b>FBG *</b></td>
+    <td>fill gaps with the defined fill character in binary files</td>
+  </tr>
+  <tr>
+    <td valign="top"><b>NFB</b></td>
+    <td>do not fill gaps with the defined fill character in binary files<br />
+    <b>Note:</b> when used, A09 does not go back in the output file any more, so constructions like <br />
+    ORG $0100 (some code) ORG $0300 (some code) <b>ORG $0200</b> (some code)<br />
+    result in the code at $0200 to be <i>at the end</i> of the binary file.</td>
+  </tr>
 </table>
 
 <p>Each of the above options has a corresponding text symbol that is set to <b>0</b>
