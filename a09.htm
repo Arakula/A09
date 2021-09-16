@@ -274,8 +274,9 @@ available in A09 (* denotes the default value for a mutually exclusive set):</p>
   </tr>
   <tr bgcolor="#f0f0f0">
     <td valign="top"><b>LPA</b></td>
-    <td>print listing in f9dasm patch format<br>
-	    This option makes it easier to create complex patches to be embedded in images processed by f9dasm</td>
+    <td>print listing in f9dasm/dasmfw patch format<br>
+	    This option makes it easier to create complex patches to be embedded in images processed by f9dasm and dasmfw.
+	    The PEMT directive can be used to generate additional info file statements.</td>
   </tr>
   <tr bgcolor="#f0f0f0">
     <td valign="top"><b>NLP *</b></td>
@@ -364,6 +365,21 @@ of these programs). Apart from these, it knows the following directives:</p>
 	<i>after</i> the <b>IF(N)D</b> directive, phasing errors can occur!</td>
   </tr>
   <tr>
+    <td valign="top"><b>PEMT <i>text</i></td>
+    <td valign="top">if the LPA option is used, PEMT outputs additional info file statements.
+    <i>text</i> is inserted verbatim in the listing; there are some expansion capabilities,
+    however:
+    <ul>
+      <li><b>*</b> (an asterisk) is expanded to the current address in hex format.</li>
+      <li><b>@(...)</b> can be used to evaluate arbitrarily complex A09 expressions.<br />
+      Inside @(), an asterisk is expanded to the current address in hex format, too,
+      but with a leading $, as the expression is then evaluated by A09.<br />
+      The output of the expression is evaluated to a hexadecimal value, unless the
+      expression is formatted as @(...)<b>,d</b>, in which case the output is decimal.</li>
+    </ul>
+    </td>
+  </tr>
+  <tr>
     <td valign="top"><b>PHASE <i>addr</i><br>DEPHASE</b></td>
     <td valign="top">tells the assembler that the following code shall be executed at
     the specified address. This &quot;shifting&quot; is switched off by the instruction
@@ -383,7 +399,6 @@ of these programs). Apart from these, it knows the following directives:</p>
     it doesn't only reserve memory, but also zeroes the reserved bytes<br />
 	<b>Note:</b> if <b><i>nnn</i></b> exceeds 255 and <b>OPT MUL</b> (see above) is set, only the first 255 bytes are shown
 	in the listing.</td>
-    </td>
   </tr>
   <tr>
     <td valign="top"><b>SETLI <i>nnn</i></b></td>

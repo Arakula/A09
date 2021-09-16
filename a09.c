@@ -283,6 +283,8 @@
    v1.48 2021-02-22 additional PEMT capabilities
                     ASLD,ASRD,CLRD,DECD,INCD,LSLD,LSRD convenience mnemonics added
                     to all 6800-based assemblers
+   v1.49 2021-09-16 additional PEMT capabilities
+                    added WRN pseudo-op to output user-defined warnings
 
 */
 
@@ -313,8 +315,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.48"
-#define VERSNUM      "$0130"            /* can be queried as &VERSION        */
+#define VERSION      "1.49"
+#define VERSNUM      "$0131"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -458,6 +460,7 @@ struct oprecord
 #define PSEUDO_FCQ           47
 #define PSEUDO_FILL          48
 #define PSEUDO_PEMT          49
+#define PSEUDO_WRN           50
 
 struct oprecord optable09[]=
   {
@@ -927,6 +930,7 @@ struct oprecord optable09[]=
   { "TXS",     OPCAT_TWOBYTE,     0x1f14 },
   { "TYS",     OPCAT_FOURBYTE,    0x34203540 },  /* PSHS Y/PULS S */
   { "WAI",     OPCAT_TWOBYTE,     0x3cff },
+  { "WRN",     OPCAT_PSEUDO,      PSEUDO_WRN },
   { "ZMB",     OPCAT_PSEUDO,      PSEUDO_RZB },
 };
 
@@ -1134,6 +1138,7 @@ struct oprecord optable00[]=
   { "TTL",     OPCAT_PSEUDO,      PSEUDO_NAM },
   { "TXS",     OPCAT_ONEBYTE,     0x35 },
   { "WAI",     OPCAT_ONEBYTE,     0x3e },
+  { "WRN",     OPCAT_PSEUDO,      PSEUDO_WRN },
   { "ZMB",     OPCAT_PSEUDO,      PSEUDO_RZB },
   };
 
@@ -1362,6 +1367,7 @@ struct oprecord optable01[]=
   { "TTL",     OPCAT_PSEUDO,      PSEUDO_NAM },
   { "TXS",     OPCAT_ONEBYTE,     0x35 },
   { "WAI",     OPCAT_ONEBYTE,     0x3e },
+  { "WRN",     OPCAT_PSEUDO,      PSEUDO_WRN },
   { "XGDX",    OPCAT_6301 |
                OPCAT_ONEBYTE,     0x18 },
   { "ZMB",     OPCAT_PSEUDO,      PSEUDO_RZB },
@@ -1606,6 +1612,7 @@ struct oprecord optable11[]=
   { "TXS",     OPCAT_ONEBYTE,     0x35 },
   { "TYS",     OPCAT_TWOBYTE,     0x1835 },
   { "WAI",     OPCAT_ONEBYTE,     0x3e },
+  { "WRN",     OPCAT_PSEUDO,      PSEUDO_WRN },
   { "XGDX",    OPCAT_ONEBYTE,     0x8f },
   { "XGDY",    OPCAT_TWOBYTE,     0x188f },
   { "ZMB",     OPCAT_PSEUDO,      PSEUDO_RZB },
@@ -1953,6 +1960,7 @@ char *errormsg[]=
 #define WRN_ADR_TRUNC     0x0010        /* Forced address truncated          */
 #define WRN_IMM_TRUNC     0x0020        /* Immediate value truncated         */
 #define WRN_ILLF_IGN      0x0040        /* Illogical forcing ignored         */
+#define WRN_WRNTXT        0x4000        /* WRN text output                   */
 
 char *warningmsg[] =
   {
@@ -1971,7 +1979,7 @@ char *warningmsg[] =
   "",                                   /* 2048                              */
   "",                                   /* 4096                              */
   "",                                   /* 8192                              */
-  "",                                   /* 18384                             */
+  NULL,                                 /* 16384 WRN_WRNTXT (WRN output)     */
   ""                                    /* 32768                             */
   };
 
@@ -3445,7 +3453,9 @@ while (parsing)
          This means that an external symbol has to be the last one in an
          expression, or the others have to be paired so that they cancel
          each other's effect AND their subexpression has to be parenthesized.*/
-      if ((ip.sym->cat == SYMCAT_EXTERN) || (p.sym->cat == SYMCAT_EXTERN))
+      char cat1 = ip.sym->cat;
+      char cat2 = p.sym->cat;
+      if (cat1 == SYMCAT_EXTERN || cat2 == SYMCAT_EXTERN)
         error |= ERR_EXPR;
       else
         ip.sym = NULL;                  /* this might be TOO crude...        */
@@ -4444,6 +4454,106 @@ for (i = 0; i < 16; i++)
 } 
 
 /*****************************************************************************/
+/* pemt_expr : recursively processes a PEMT expression enclosed in @(...)    */
+/*****************************************************************************/
+
+int pemt_expr
+    (
+    int atat,                           /* @ position in szBuf1              */
+    char *szOutBuf,                     /* output buffer address             */
+    int *newpos                         /* position after processing         */
+    )
+{
+char lBsl = 0, odec = 0;
+char szInt[LINELEN];
+int i, lvl = 1, ol = 0;
+const char *fmts[] =
+  {
+  "%04lX",
+  "%ld",
+  "%04lX"
+  };
+
+for (i = atat + 2; szBuf1[i]; i++)      /* walk through the string           */
+  {
+  if (szBuf1[i] == '*' && !lBsl)        /* if on a plain *, replace with addr*/
+    {
+    /* inside @(...), * is expanded to $addr, as this is the format used
+       in scanexpr()! */
+    char odec2 = 0;
+    const char *fmts2[] =
+      {
+      "$%04lX",
+      "%ld",
+      "$%04lX"
+      };
+    if (szBuf1[i + 1] == ',' &&         /* *,d means "output addr as dec"    */
+        (szBuf1[i + 2] == 'd' ||        /* *,x means output addr as hex"     */
+         szBuf1[i + 2] == 'x'))
+      {
+      odec2 = 1 + (szBuf1[i + 2] == 'x');
+      i += 2;
+      }
+    ol += sprintf(szInt + ol, fmts2[odec2], oldlc);
+    }
+  else if (szBuf1[i] == '@' && szBuf1[i + 1] == '(' && !lBsl)
+    {                                   /* if on @(, recurse                 */
+    ol += pemt_expr(i, szInt + ol, &i);
+    }
+  else if (szBuf1[i] == '(')            /* if on (, increase level           */
+    {
+    if (!lBsl)
+      lvl++;
+    szInt[ol++] = szBuf1[i];
+    szInt[ol] = '\0';
+    }
+  else if (szBuf1[i] == ')')            /* if on ), stop this.               */
+    {
+    if (!lBsl)
+      lvl--;
+    if (!lvl)
+      {
+      /* ),d as end means "output as dec", ),x means "output as hex"  */
+      if (szBuf1[i + 1] == ',' && 
+          (szBuf1[i + 2] == 'd' || szBuf1[i + 2] == 'x'))
+        {
+        odec = 1 + (szBuf1[i + 2] == 'x');
+        i += 2;
+        }
+      break;
+      }
+    szInt[ol++] = szBuf1[i];
+    szInt[ol] = '\0';
+    }
+  else if (szBuf1[i] == '\\' && !lBsl)
+    ;
+  else
+    {
+    szInt[ol++] = szBuf1[i];
+    szInt[ol] = '\0';
+    }
+
+  lBsl = (szBuf1[i] == '\\');           /* remember whether on \             */
+  }
+
+*newpos = i;                            /* tell caller where we ended        */
+if (i > atat + 2)                       /* if something to evaluate          */
+  {                                     /* evaluate it                       */
+  char *osp = srcptr;
+  long l;
+  struct relocrecord pp = {0};
+  srcptr = szInt;
+  l = scanexpr(0, &pp);
+  if (pass == 2 && unknown)             /* unresolved items are not allowed  */
+    error |= ERR_LABEL_UNDEF;
+  ol = sprintf(szOutBuf, fmts[odec], l);
+  srcptr = osp;
+  }
+
+return ol;
+}
+
+/*****************************************************************************/
 /* outlist : lists the code bytes for an instruction                         */
 /*****************************************************************************/
 
@@ -4522,9 +4632,11 @@ if (dwOptions & OPTION_LPA)             /* if in patch mode                  */
       case PSEUDO_PEMT :
         {
         char lBsl = 0;
-        int lP = -1, rP = -1;
         /* Specials: 
            - '*' means "current address", unless prefixed with '\\'
+             always output as hex value without leading $, as this is
+             for dasmfw / f9dasm, which expect hex without $.
+             For more complex evaluations, use @(...).
            - '@(...)' means "evaluate the expression with scanexpr() and
              use the result as a numerical value", unless prefixed with '\\'
         */
@@ -4534,33 +4646,9 @@ if (dwOptions & OPTION_LPA)             /* if in patch mode                  */
             putlist("%04X", oldlc);
           else if (szBuf1[i] == '@' && szBuf1[i + 1] == '(' && !lBsl)
             {
-            int j, lP = 1;
-            for (j = i + 2; szBuf1[j]; j++)
-              {
-              if (szBuf1[j] == '(')
-                lP++;
-              else if (szBuf1[j] == ')')
-                {
-                lP--;
-                if (!lP)
-                  break;
-                }
-              }
-            /* OK, we're either on EOL or closing ) */
-            if (j > i + 2)
-              {
-              char *osp = srcptr;
-              long l;
-              struct relocrecord pp = {0};
-              memcpy(szBuf2, szBuf1 + i + 2, (size_t)j - i - 1);
-              szBuf2[j - i - 2] = '\0';
-              srcptr = szBuf2;
-              l = scanexpr(0, &pp);
-              // garbage in, garbage out ...
-              putlist("%04X", l);
-              srcptr = osp;
-              }
-            i = j;
+            char szExpr[10];
+            pemt_expr(i, szExpr, &i);
+            putlist("%s", szExpr);
             }
           else
             putlist("%c", szBuf1[i]);
@@ -6790,6 +6878,15 @@ switch (co)
       {
       errormsg[14] = srcptr;
       error |= ERR_ERRTXT;
+      }
+    break;
+  case PSEUDO_WRN :                     /* WRN text?                         */
+    if (!(dwOptions & OPTION_TSC))
+      skipspace();
+    if (pass != 1)                      /* ignore in pass 1                  */
+      {
+      warningmsg[14] = srcptr;
+      warning |= WRN_WRNTXT;
       }
     break;
   case PSEUDO_TEXT :                    /* TEXT text ?                       */
