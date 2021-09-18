@@ -285,6 +285,10 @@
                     to all 6800-based assemblers
    v1.49 2021-09-16 additional PEMT capabilities
                     added WRN pseudo-op to output user-defined warnings
+   v1.50 2021-09-18 ";;" or "**" in LPA mode works like an inline version
+                      of PEMT [l]comment without expansions
+                    ";@" or "*@" in LPA mode at the start of a line works like
+                      an inline version of PEMT insert without expansions
 
 */
 
@@ -315,8 +319,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.49"
-#define VERSNUM      "$0131"            /* can be queried as &VERSION        */
+#define VERSION      "1.50"
+#define VERSNUM      "$0132"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -4725,21 +4729,25 @@ else                                    /* otherwise                         */
 
 putlist("\n");                          /* send newline                      */
 
-#if 0
-/* that is ... too much. PEMT is more tedious, but gives finer control. */
+/* allow to create [l]comments by using a double comment character;
+   commentchar+@ on start of line creates an insert instead of a comment */
 if ((dwOptions & OPTION_LPA) &&         /* patch output - check for comments */
     (*curline->txt))
   {
   char nonblnk = 0;
   int bef = 0;
   int fnd = -1;
+  char c;
   for (i = 0; curline->txt[i]; i++)
     {
-    char c = curline->txt[i];
-    if ((c == '*') ||
-        ((dwOptions & OPTION_GAS) && (c == '|')) ||
-        (c == ';'))
+    c = curline->txt[i];
+    if (((c == '*') ||
+         ((dwOptions & OPTION_GAS) && (c == '|')) ||
+         (c == ';')) &&
+        (c == curline->txt[i + 1] || 
+         (curline->txt[i + 1] == '@' && !nonblnk)))
       {
+      c = curline->txt[++i];
       fnd = ++i;
       if (isspace(curline->txt[fnd]))
         fnd++;
@@ -4753,10 +4761,12 @@ if ((dwOptions & OPTION_LPA) &&         /* patch output - check for comments */
     else
       nonblnk = 1;
     }
-  if (fnd > 0 && curline->txt[fnd])
+  if (fnd > 0 && (curline->txt[fnd] || !(nonblnk || bef > 2)))
     {
     if (nonblnk || bef > 2)
       putlist("lcomment %04X ", oldlc);
+    else if (c == '@')
+      putlist("insert %04X ", oldlc);
     else
       putlist("comment %04X ", oldlc);
     if (isspace(curline->txt[fnd]))
@@ -4771,7 +4781,6 @@ if ((dwOptions & OPTION_LPA) &&         /* patch output - check for comments */
     putlist("\n");
     }
   }
-#endif
 
 if (codeptr > MAXLISTBYTES &&           /* if there are additional bytes,    */
     (dwOptions & (OPTION_LPA | OPTION_MUL)))
