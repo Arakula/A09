@@ -289,7 +289,15 @@
                       of PEMT [l]comment without expansions
                     ";@" or "*@" in LPA mode at the start of a line works like
                       an inline version of PEMT insert without expansions
-
+                    an appended "+" means "after"
+   v1.51 2021-10-19 PEMT improvements
+   v1.52 2022-04-22 increase Motorola as9 compatibility by NOT flagging
+                      16-bit relative offsets as error but silently wrapping
+                      around the 64K boundary if possible
+                      Thanks to Michael Oehler for pointing that out.
+                    "LDA B 1,X" didn't work, not even in TSC mode. See
+                        https://github.com/Arakula/A09/issues/10
+                      for details.
 */
 
 /* @see https://stackoverflow.com/questions/2989810/which-cross-platform-preprocessor-defines-win32-or-win32-or-win32
@@ -319,8 +327,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.50"
-#define VERSNUM      "$0132"            /* can be queried as &VERSION        */
+#define VERSION      "1.52"
+#define VERSNUM      "$0134"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -406,6 +414,7 @@ struct oprecord
 #define OPCAT_ACCADDR        0x0018     /* single address instrs, 6800  NEG  */
 #define OPCAT_SETMASK        0x0019     /* set/clear with mask, 68HC11 BCLR  */
 #define OPCAT_BRMASK         0x001a     /* branch with mask, 68HC11   BRCLR  */
+#define OPCAT_OACCARITH      0x001b     /* acc. instr. w.optional acc   LDA  */
 #define OPCAT_PSEUDO         0x003f     /* pseudo-ops                        */
 #define OPCAT_6309           0x0040     /* valid for 6309 only!              */
 #define OPCAT_NOIMM          0x0080     /* immediate not allowed!       STD  */
@@ -711,7 +720,7 @@ struct oprecord optable09[]=
   { "LBVC",    OPCAT_LBR2BYTE,    0x1028 },
   { "LBVS",    OPCAT_LBR2BYTE,    0x1029 },
   { "LD",      OPCAT_ACCARITH,    0x86 },
-  { "LDA",     OPCAT_ARITH,       0x86 },
+  { "LDA",     OPCAT_OACCARITH,   0x86 },
   { "LDAA",    OPCAT_ARITH,       0x86 },
   { "LDAB",    OPCAT_ARITH,       0xc6 },
   { "LDAD",    OPCAT_DBLREG1BYTE, 0xcc },
@@ -1047,7 +1056,7 @@ struct oprecord optable00[]=
   { "INX",     OPCAT_ONEBYTE,     0x08 },
   { "JMP",     OPCAT_IDXEXT,      0x4e },
   { "JSR",     OPCAT_IDXEXT,      0x8d },
-  { "LDA",     OPCAT_ACCARITH,    0x86 },
+  { "LDA",     OPCAT_OACCARITH,   0x86 },
   { "LDAA",    OPCAT_ARITH,       0x86 },
   { "LDAB",    OPCAT_ARITH,       0xc6 },
   { "LDB",     OPCAT_ARITH,       0xc6 },
@@ -1263,7 +1272,7 @@ struct oprecord optable01[]=
   { "JMP",     OPCAT_IDXEXT,      0x4e },
   { "JSR",     OPCAT_NOIMM |
                OPCAT_DBLREG1BYTE, 0x8d },
-  { "LDA",     OPCAT_ACCARITH,    0x86 },
+  { "LDA",     OPCAT_OACCARITH,   0x86 },
   { "LDAA",    OPCAT_ARITH,       0x86 },
   { "LDAB",    OPCAT_ARITH,       0xc6 },
   { "LDB",     OPCAT_ARITH,       0xc6 },
@@ -1504,7 +1513,7 @@ struct oprecord optable11[]=
   { "JMP",     OPCAT_IDXEXT,      0x4e },
   { "JSR",     OPCAT_NOIMM |
                OPCAT_DBLREG1BYTE, 0x8d },
-  { "LDA",     OPCAT_ACCARITH,    0x86 },
+  { "LDA",     OPCAT_OACCARITH,   0x86 },
   { "LDAA",    OPCAT_ARITH,       0x86 },
   { "LDAB",    OPCAT_ARITH,       0xc6 },
   { "LDB",     OPCAT_ARITH,       0xc6 },
@@ -1964,6 +1973,7 @@ char *errormsg[]=
 #define WRN_ADR_TRUNC     0x0010        /* Forced address truncated          */
 #define WRN_IMM_TRUNC     0x0020        /* Immediate value truncated         */
 #define WRN_ILLF_IGN      0x0040        /* Illogical forcing ignored         */
+#define WRN_REL_WRAP      0x0080        /* Relative address wraparound       */
 #define WRN_WRNTXT        0x4000        /* WRN text output                   */
 
 char *warningmsg[] =
@@ -1976,7 +1986,7 @@ char *warningmsg[] =
   "Forced address truncated",           /* 16    WRN_ADR_TRUNC               */
   "Immediate value truncated",          /* 32    WRN_IMM_TRUNC               */
   "Illogical forcing ignored",          /* 64    WRN_ILLF_IGN                */
-  "",                                   /* 128                               */
+  "Relative addressing wraparound",     /* 128   WRN_REL_WRAP                */
   "",                                   /* 256                               */
   "",                                   /* 512                               */
   "",                                   /* 1024                              */
@@ -2486,7 +2496,7 @@ return symtable + i;                    /* return the found or inserted sym  */
 }  
 
 /*****************************************************************************/
-/* findsymat : finds 1st symbol fo a given address                           */
+/* findsymat : finds 1st symbol for a given address                          */
 /*****************************************************************************/
 
 char *findsymat(unsigned short addr)
@@ -4463,14 +4473,15 @@ for (i = 0; i < 16; i++)
 
 int pemt_expr
     (
+    const char *szBuf1,                 /* buffer we're working on           */
     int atat,                           /* @ position in szBuf1              */
     char *szOutBuf,                     /* output buffer address             */
     int *newpos                         /* position after processing         */
     )
 {
-char lBsl = 0, odec = 0;
+char lBsl = 0;
 char szInt[LINELEN];
-int i, lvl = 1, ol = 0;
+int i, lvl = 1, ol = 0, odec = 0;
 const char *fmts[] =
   {
   "%04lX",
@@ -4480,11 +4491,12 @@ const char *fmts[] =
 
 for (i = atat + 2; szBuf1[i]; i++)      /* walk through the string           */
   {
-  if (szBuf1[i] == '*' && !lBsl)        /* if on a plain *, replace with addr*/
+  char c = szBuf1[i];
+  if (c == '*' && !lBsl)                /* if on a plain *, replace with addr*/
     {
     /* inside @(...), * is expanded to $addr, as this is the format used
        in scanexpr()! */
-    char odec2 = 0;
+    int odec2 = 0;
     const char *fmts2[] =
       {
       "$%04lX",
@@ -4500,18 +4512,18 @@ for (i = atat + 2; szBuf1[i]; i++)      /* walk through the string           */
       }
     ol += sprintf(szInt + ol, fmts2[odec2], oldlc);
     }
-  else if (szBuf1[i] == '@' && szBuf1[i + 1] == '(' && !lBsl)
+  else if (c == '@' && szBuf1[i + 1] == '(' && !lBsl)
     {                                   /* if on @(, recurse                 */
-    ol += pemt_expr(i, szInt + ol, &i);
+    ol += pemt_expr(szBuf1, i, szInt + ol, &i);
     }
-  else if (szBuf1[i] == '(')            /* if on (, increase level           */
+  else if (c == '(')                    /* if on (, increase level           */
     {
     if (!lBsl)
       lvl++;
-    szInt[ol++] = szBuf1[i];
+    szInt[ol++] = c;
     szInt[ol] = '\0';
     }
-  else if (szBuf1[i] == ')')            /* if on ), stop this.               */
+  else if (c == ')')                    /* if on ), stop this.               */
     {
     if (!lBsl)
       lvl--;
@@ -4526,18 +4538,18 @@ for (i = atat + 2; szBuf1[i]; i++)      /* walk through the string           */
         }
       break;
       }
-    szInt[ol++] = szBuf1[i];
+    szInt[ol++] = c;
     szInt[ol] = '\0';
     }
-  else if (szBuf1[i] == '\\' && !lBsl)
+  else if (c == '\\' && !lBsl)
     ;
   else
     {
-    szInt[ol++] = szBuf1[i];
+    szInt[ol++] = c;
     szInt[ol] = '\0';
     }
 
-  lBsl = (szBuf1[i] == '\\');           /* remember whether on \             */
+  lBsl = !lBsl && (c == '\\');          /* remember whether on \             */
   }
 
 *newpos = i;                            /* tell caller where we ended        */
@@ -4558,10 +4570,46 @@ return ol;
 }
 
 /*****************************************************************************/
+/* pemt_putlist : lists the (rest of the) line with PEMT expressions         */
+/*****************************************************************************/
+
+void pemt_putlist(const char *szLine, int off)
+{
+/* Specials: 
+   - '*' means "current address", unless prefixed with '\'
+     always output as hex value without leading $, as this is
+     for dasmfw / f9dasm, which expect hex without $.
+     For more complex evaluations, use @(...).
+   - '@(...)' means "evaluate the expression with scanexpr() and
+     use the result as a numerical value", unless prefixed with '\'
+*/
+char lBsl = 0;
+for ( ; szLine[off]; off++)
+  {
+  char c = szLine[off];
+  if (szLine[off] == '*' && !lBsl)
+    putlist("%04X", oldlc);
+  else if (c == '@' && szLine[off + 1] == '(' && !lBsl)
+    {
+    char szExpr[33];
+    pemt_expr(szLine, off, szExpr, &off);
+    putlist("%s", szExpr);
+    }
+  else if (c == '\\' && !lBsl)          /* \ is an escape char, so ...       */
+    ;                                   /* skip the first one.               */
+    /* NB: to output a \, two are needed. To output \*, \\\* must be written */
+  else
+    putlist("%c", c);
+  lBsl = !lBsl && (c == '\\');
+  }
+putlist("\n");
+}
+
+/*****************************************************************************/
 /* outlist : lists the code bytes for an instruction                         */
 /*****************************************************************************/
 
-void outlist(struct oprecord *op)
+void outlist(struct oprecord *op, struct symrecord *lpLabel)
 {
 int i;
 
@@ -4634,38 +4682,13 @@ if (dwOptions & OPTION_LPA)             /* if in patch mode                  */
         putlist("\n");
         break;
       case PSEUDO_PEMT :
-        {
-        char lBsl = 0;
-        /* Specials: 
-           - '*' means "current address", unless prefixed with '\\'
-             always output as hex value without leading $, as this is
-             for dasmfw / f9dasm, which expect hex without $.
-             For more complex evaluations, use @(...).
-           - '@(...)' means "evaluate the expression with scanexpr() and
-             use the result as a numerical value", unless prefixed with '\\'
-        */
-        for (i = 0; szBuf1[i]; i++)
-          {
-          if (szBuf1[i] == '*' && !lBsl)
-            putlist("%04X", oldlc);
-          else if (szBuf1[i] == '@' && szBuf1[i + 1] == '(' && !lBsl)
-            {
-            char szExpr[10];
-            pemt_expr(i, szExpr, &i);
-            putlist("%s", szExpr);
-            }
-          else
-            putlist("%c", szBuf1[i]);
-          lBsl = (szBuf1[i] == '\\');
-          }
-        putlist("\n");
-        }
+        pemt_putlist(szBuf1, 0);
         break;
       }
     }
   if (codeptr > 0)                      /* if there are code bytes           */
     {
-    char *name = findsymat(oldlc);
+    char *name = lpLabel ? lpLabel->name : findsymat(oldlc);
     if (name)
       putlist("label %04X %s\n", oldlc, name);
     putlist("patch ");                  /* write "patch"                     */
@@ -4734,22 +4757,34 @@ putlist("\n");                          /* send newline                      */
 if ((dwOptions & OPTION_LPA) &&         /* patch output - check for comments */
     (*curline->txt))
   {
-  char nonblnk = 0;
-  int bef = 0;
-  int fnd = -1;
-  char c;
-  for (i = 0; curline->txt[i]; i++)
+#if 1
+  /* work on the already expanded text */
+  const char *srcptr = srcline;
+#else
+  /* work on the original text */
+  const char *srcptr = curline->txt;
+#endif
+  char c, iscchr, incomment = 0, nonblnk = 0, add_after = 0;
+  int fnd = -1, bef = 0;
+  for (i = 0; srcptr[i]; i++)
     {
-    c = curline->txt[i];
-    if (((c == '*') ||
-         ((dwOptions & OPTION_GAS) && (c == '|')) ||
-         (c == ';')) &&
-        (c == curline->txt[i + 1] || 
-         (curline->txt[i + 1] == '@' && !nonblnk)))
+    c = srcptr[i];
+    iscchr = ((c == '*') ||
+              ((dwOptions & OPTION_GAS) && (c == '|')) ||
+              (c == ';'));
+    if (!incomment &&
+        iscchr &&
+        (c == srcptr[i + 1] || 
+         (srcptr[i + 1] == '@' && !nonblnk)))
       {
-      c = curline->txt[++i];
+      c = srcptr[++i];
+      if (srcptr[i + 1] == '+')
+        {
+        ++i;
+        add_after = 1;
+        }
       fnd = ++i;
-      if (isspace(curline->txt[fnd]))
+      if (isspace(srcptr[fnd]))
         fnd++;
       break;
       }
@@ -4759,26 +4794,23 @@ if ((dwOptions & OPTION_LPA) &&         /* patch output - check for comments */
         bef++;
       }
     else
+      {
+      if (iscchr)
+        incomment = 1;
       nonblnk = 1;
+      }
     }
-  if (fnd > 0 && (curline->txt[fnd] || !(nonblnk || bef > 2)))
+  if (fnd > 0 && (srcptr[fnd] || !(nonblnk || bef > 2)))
     {
     if (nonblnk || bef > 2)
-      putlist("lcomment %04X ", oldlc);
+      putlist("lcomment %s%04X ", add_after ? "after " : "", oldlc);
     else if (c == '@')
-      putlist("insert %04X ", oldlc);
+      putlist("insert %s%04X ", add_after ? "after " : "", oldlc);
     else
-      putlist("comment %04X ", oldlc);
-    if (isspace(curline->txt[fnd]))
+      putlist("comment %s%04X ", add_after ? "after " : "", oldlc);
+    if (isspace(srcptr[fnd]))
       putlist("\\");
-    for ( ; curline->txt[fnd]; fnd++)
-      {
-      char c = curline->txt[fnd];
-      if (c == '*')
-        putlist("\\");
-      putlist("%c", c);
-      }
-    putlist("\n");
+    pemt_putlist(srcptr, fnd);
     }
   }
 
@@ -4970,6 +5002,21 @@ switch (mode)
         }
       if (!unknown)
         {
+        // for Motorola as9 compatibility - overflows are captured
+        // and wrapped around if possible
+        if (opsize == 3)
+          {
+          if (offs < -32768)
+            {
+            offs += 0x10000;
+            warning |= WRN_REL_WRAP;
+            }
+          else if (offs > 32767)
+            {
+            offs -= 0x10000;
+            warning |= WRN_REL_WRAP;
+            }
+          }
         if ((opsize == 2 && (offs < -128 || offs >= 128)) ||
             (opsize == 3 && (offs < -32768 || offs >= 32768)))
           error |= ERR_RANGE;
@@ -5168,6 +5215,7 @@ void accarith(int co, char noimm, char ignore)
 {
 char *s = srcptr;                       /* remember current offset           */
 char correct = 1;                       /* flag whether correct              */
+int n;
 
 skipspace();                            /* skip space                        */
 scanname();                             /* get following name                */
@@ -5177,7 +5225,8 @@ if (strcmp(unamebuf, "A") &&            /* has to be followed by A or B      */
   correct = 0;
 
 #if 1
-if (*srcptr == ',')                     /* if directly followed by a comma   */
+n = skipspace();                        /* might be followed by blanks ...   */
+if (!n && *srcptr == ',')               /* or by a comma; if comma,          */
   srcptr++;                             /* skip it                           */
 #else
 if (!(dwOptions & OPTION_TSC))
@@ -5193,8 +5242,13 @@ if (!correct)                           /* if NOT followed by "A," or "B,"   */
   else                                  /* otherwise                         */
     error |= ERR_EXPR;                  /* flag as an error                  */
   }
-else if (unamebuf[0] == 'B')            /* eventually transform to acc.B     */
-  co |= 0x40;
+else
+  {
+  if (unamebuf[0] == 'B')               /* eventually transform to acc.B     */
+    co |= 0x40;
+  if (ignore)
+    warning |= WRN_AMBIG;
+  }
 arith(co, noimm);                       /* then process as arithmetic        */
 }
 
@@ -6612,10 +6666,10 @@ switch (co)
       }
     break;
   case PSEUDO_END :                     /* END [loadaddr]                    */
-    nRepNext = 0;                       /* reset eventual repeat             */
+    nRepNext = 0;                       /* reset possible repeat             */
+    skipspace();                        /* skip blanks                       */
     if ((curline->lvl & 0x0f) == 0)     /* only in outermost level!          */
       {
-      skipspace();                      /* skip blanks                       */
       if (isfactorstart(*srcptr))       /* if possible transfer address      */
         {
         tfradr = (unsigned short)       /* get transfer address              */
@@ -6625,8 +6679,9 @@ switch (co)
         else                            /* otherwise                         */
           tfradrset = 1;                /* remember transfer addr. is set    */
         }
-      terminate = 1;
       }
+                                        /* terminate current level           */
+    terminate = (curline->lvl & 0x0f);  /* (and any sublevels)               */
     break;     
   case PSEUDO_INCLUDE :                 /* INCLUDE <filename>                */
     nRepNext = 0;                       /* reset eventual repeat             */
@@ -7062,7 +7117,7 @@ if ((listing & LIST_ON) &&              /* if listing pass 1                 */
     (dwOptions & OPTION_LIS) &&
     (dwOptions & OPTION_LP1) &&
     (dwOptions & OPTION_MAC))
-  outlist(NULL);                        /* show macro invocation BEFORE      */
+  outlist(NULL, NULL);                  /* show macro invocation BEFORE      */
                                         /* processing the expansions         */
 #endif
 
@@ -7387,7 +7442,7 @@ codeptr = 0;
 
 void processline()
 {
-struct symrecord *lp, *lpmac = NULL;
+struct symrecord *lp, *lpLabel = NULL, *lpmac = NULL;
 struct oprecord *op = NULL;
 int co;
 unsigned short cat;
@@ -7423,6 +7478,8 @@ if (isValidNameChar(*srcptr, 1))        /* look for label on line start      */
       (lp->cat != SYMCAT_COMMONDATA) &&
       (lp->u.flags & SYMFLAG_FORWARD))
     lp->u.flags |= SYMFLAG_PASSED;
+
+  lpLabel = lp;
   } 
 skipspace();
 
@@ -7532,6 +7589,9 @@ if (isValidNameChar(*srcptr, 1))        /* mnemonic or macro name            */
         case OPCAT_ACCARITH :           /* 6800-style arith                  */
           accarith(co, noimm, 0);
           break;
+        case OPCAT_OACCARITH :          /* potential 6800-style arith        */
+          accarith(co, noimm, 1);
+          break;
         case OPCAT_DBLREG1BYTE :
           if ((dwOptions & OPTION_H11) && (page & OPCAT_PAGE18))
             darith18(co, noimm);
@@ -7625,7 +7685,7 @@ if (pass == 2)
   outbuffer();
   if ((listing & LIST_ON) &&
       (dwOptions & OPTION_LIS))
-    outlist(op);
+    outlist(op, lpLabel);
   }
 else if ((listing & LIST_ON) &&
          (dwOptions & OPTION_LIS) &&
@@ -7634,7 +7694,7 @@ else if ((listing & LIST_ON) &&
   if (curline->lvl & LINCAT_MACEXP ||   /* prevent 2nd listing of macro      */
       !curline->next ||                 /* since this is done in expansion   */
       !(curline->next->lvl & LINCAT_MACEXP))
-    outlist(op);
+    outlist(op, lpLabel);
   }
 
 if (error || warning)
@@ -7702,7 +7762,7 @@ else
 if (((pass == 2) || (dwOptions & OPTION_LP1)) &&
     (listing & LIST_ON) &&
     (dwOptions & OPTION_LIS))
-  outlist(op);
+  outlist(op, NULL);
 }
 
 /*****************************************************************************/
@@ -7885,32 +7945,36 @@ void processfile(struct linebuf *pline)
 {
 struct linebuf *plast = pline;
 
-while (!terminate && pline)
+while (pline)
   {
-  curline = pline;
-  error = ERR_OK;
-  warning = WRN_OK;
-  expandtext();                         /* expand text symbols               */
-  srcptr = srcline;
-  if (suppress || nSkipCount)
-    suppressline();
-  else
+  if (terminate < 0 ||                  /* skip all lines until going up     */
+      (pline->lvl & 0x0f) < terminate)
     {
-    if (nRepNext)
+    curline = pline;
+    error = ERR_OK;
+    warning = WRN_OK;
+    expandtext();                       /* expand text symbols               */
+    srcptr = srcline;
+    if (suppress || nSkipCount)
+      suppressline();
+    else
       {
-      for (; nRepNext > 0; nRepNext--)
+      if (nRepNext)
+        {
+        for (; nRepNext > 0; nRepNext--)
+          {
+          processline();
+          error = ERR_OK;
+          warning = WRN_OK;
+          }
+        nRepNext = 0;
+        }
+      else
         {
         processline();
         error = ERR_OK;
         warning = WRN_OK;
         }
-      nRepNext = 0;
-      }
-    else
-      {
-      processline();
-      error = ERR_OK;
-      warning = WRN_OK;
       }
     }
   plast = pline;
@@ -7966,7 +8030,7 @@ nTotErrors = errors = 0;
 nTotWarnings = warnings = 0;
 generating = 0;
 common = 0;
-terminate = 0;
+terminate = -1;
 if (!absmode)                           /* in relocating mode                */
   dpsetting = -1;                       /* there IS no Direct Page           */
 
@@ -8021,7 +8085,7 @@ phase = 0;
 errors = 0;
 warnings = 0;
 generating = 0;
-terminate = 0;
+terminate = -1;
 memset(bUsedBytes, 0, sizeof(bUsedBytes));
 for (i = 0; i < symcounter; i++)        /* reset all PASSED flags            */
   if (symtable[i].cat != SYMCAT_COMMONDATA)
