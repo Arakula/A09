@@ -298,6 +298,7 @@
                     "LDA B 1,X" didn't work, not even in TSC mode. See
                         https://github.com/Arakula/A09/issues/10
                       for details.
+   v1.53 2022-04-25 fix https://github.com/Arakula/A09/issues/11
 */
 
 /* @see https://stackoverflow.com/questions/2989810/which-cross-platform-preprocessor-defines-win32-or-win32-or-win32
@@ -327,8 +328,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.52"
-#define VERSNUM      "$0134"            /* can be queried as &VERSION        */
+#define VERSION      "1.53"
+#define VERSNUM      "$0135"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -720,7 +721,7 @@ struct oprecord optable09[]=
   { "LBVC",    OPCAT_LBR2BYTE,    0x1028 },
   { "LBVS",    OPCAT_LBR2BYTE,    0x1029 },
   { "LD",      OPCAT_ACCARITH,    0x86 },
-  { "LDA",     OPCAT_OACCARITH,   0x86 },
+  { "LDA",     OPCAT_ACCARITH,    0x86 },
   { "LDAA",    OPCAT_ARITH,       0x86 },
   { "LDAB",    OPCAT_ARITH,       0xc6 },
   { "LDAD",    OPCAT_DBLREG1BYTE, 0xcc },
@@ -1056,7 +1057,7 @@ struct oprecord optable00[]=
   { "INX",     OPCAT_ONEBYTE,     0x08 },
   { "JMP",     OPCAT_IDXEXT,      0x4e },
   { "JSR",     OPCAT_IDXEXT,      0x8d },
-  { "LDA",     OPCAT_OACCARITH,   0x86 },
+  { "LDA",     OPCAT_ACCARITH,    0x86 },
   { "LDAA",    OPCAT_ARITH,       0x86 },
   { "LDAB",    OPCAT_ARITH,       0xc6 },
   { "LDB",     OPCAT_ARITH,       0xc6 },
@@ -1272,7 +1273,7 @@ struct oprecord optable01[]=
   { "JMP",     OPCAT_IDXEXT,      0x4e },
   { "JSR",     OPCAT_NOIMM |
                OPCAT_DBLREG1BYTE, 0x8d },
-  { "LDA",     OPCAT_OACCARITH,   0x86 },
+  { "LDA",     OPCAT_ACCARITH,    0x86 },
   { "LDAA",    OPCAT_ARITH,       0x86 },
   { "LDAB",    OPCAT_ARITH,       0xc6 },
   { "LDB",     OPCAT_ARITH,       0xc6 },
@@ -1513,7 +1514,7 @@ struct oprecord optable11[]=
   { "JMP",     OPCAT_IDXEXT,      0x4e },
   { "JSR",     OPCAT_NOIMM |
                OPCAT_DBLREG1BYTE, 0x8d },
-  { "LDA",     OPCAT_OACCARITH,   0x86 },
+  { "LDA",     OPCAT_ACCARITH,    0x86 },
   { "LDAA",    OPCAT_ARITH,       0x86 },
   { "LDAB",    OPCAT_ARITH,       0xc6 },
   { "LDB",     OPCAT_ARITH,       0xc6 },
@@ -5214,39 +5215,52 @@ doaddress(&p);
 void accarith(int co, char noimm, char ignore)
 {
 char *s = srcptr;                       /* remember current offset           */
-char correct = 1;                       /* flag whether correct              */
-int n;
+char expacc = 1;                        /* flag whether explicit acc.        */
+char ambig = 0;
+
+/* this is supposed to catch 6800 legacy expressions of the form
+     LDA A operands (i.e., a 6809 LDA mnemonic)
+     LDA B operands (i.e., a 6809 LDB mnemonic)
+   but it should NOT catch
+     LDA A,X
+     LDA B,X
+   which are valid 6809 operations! */
 
 skipspace();                            /* skip space                        */
 scanname();                             /* get following name                */
 
 if (strcmp(unamebuf, "A") &&            /* has to be followed by A or B      */
     strcmp(unamebuf, "B"))
-  correct = 0;
+  expacc = 0;
 
 #if 1
-n = skipspace();                        /* might be followed by blanks ...   */
-if (!n && *srcptr == ',')               /* or by a comma; if comma,          */
-  srcptr++;                             /* skip it                           */
+if (expacc && !skipspace())
+  expacc = 0;
+if (expacc && *srcptr == ',' && !(dwOptions & OPTION_TSC))
+  ambig = 1;
 #else
 if (!(dwOptions & OPTION_TSC))
   skipspace();
 if (*srcptr++ != ',')                   /* and a comma                       */
-  correct = 0;
+  expacc = 0;
 #endif
 
-if (!correct)                           /* if NOT followed by "A," or "B,"   */
+if (!expacc)                            /* if NOT followed by "A " or "B "   */
   {
+#if 1
+  srcptr = s;                           /* go back to parm start             */
+#else
   if (ignore)                           /* if ignoring that,                 */
     srcptr = s;                         /* go back to parm start             */
   else                                  /* otherwise                         */
     error |= ERR_EXPR;                  /* flag as an error                  */
+#endif
   }
 else
   {
   if (unamebuf[0] == 'B')               /* eventually transform to acc.B     */
     co |= 0x40;
-  if (ignore)
+  if (ambig)
     warning |= WRN_AMBIG;
   }
 arith(co, noimm);                       /* then process as arithmetic        */
@@ -5402,8 +5416,12 @@ struct relocrecord p = {0};
 char *s;
 
 skipspace();
+#if 1
+if (co != 0x0e)                         /* check for 6800 convenience things */
+#else
 if ((dwOptions & OPTION_TSC) &&         /* if TSC mode, check for 6800       */
     (co != 0x0e))                       /* convenience things                */
+#endif
   {
   s = srcptr;
   scanname();                           /* look whether followed by A or B   */
