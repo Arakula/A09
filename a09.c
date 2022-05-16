@@ -299,6 +299,8 @@
                         https://github.com/Arakula/A09/issues/10
                       for details.
    v1.53 2022-04-25 fix https://github.com/Arakula/A09/issues/11
+   v1.54 2022-04-25 6800 alternative mnemonics are not TSC-specific any more 
+   v1.55 2022-05-16 RMB,RZB et al. now get printed with offset in listing
 */
 
 /* @see https://stackoverflow.com/questions/2989810/which-cross-platform-preprocessor-defines-win32-or-win32-or-win32
@@ -328,8 +330,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.53"
-#define VERSNUM      "$0135"            /* can be queried as &VERSION        */
+#define VERSION      "1.55"
+#define VERSNUM      "$0137"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -2088,6 +2090,12 @@ int suppress;                           /* 0=no suppress                     */
 char condline = 0;                      /* flag whether on conditional line  */
 int ifcount;                            /* count of nested IFs within        */
                                         /* suppressed text                   */
+int printovr = 0;                       /* print override flags:             */
+#define PRINTOV_PADDR   1               /* print address in listing          */
+#define PRINTOV_PLABEL  2               /* print label address in listing    */
+#define PRINTOV_PDP     4               /* print direct page in listing      */
+#define PRINTOV_PTFR    8               /* print transfer address in listing */
+#define PRINTOV_PPHA   16               /* print phase in listing            */
 
 #define OUT_NONE  -1                    /* no output                         */
 #define OUT_BIN   0                     /* binary output                     */
@@ -3922,6 +3930,24 @@ operand = 0;
 skipspace();
 c = *srcptr;
 mode = ADRMODE_IMM;
+
+/*
+What's still sorely missing here:
+something to catch the first part of the bit mask stuff in constructs like
+  addr,[#]mask
+  addr,[#]mask,target
+where processing should stop after addr
+and
+  [[off],]indexreg,[#]mask
+  [[off],]indexreg,[#]mask,target
+where processing should stop after indexreg.
+Until then, it's only possible to specify them like
+  addr [#]mask
+  addr [#]mask,target
+  [[off],]indexreg [#]mask
+  [[off],]indexreg [#]mask target
+*/
+
 switch (toupper(c))
   {
   case 'X' :                            /* "X"?                              */
@@ -4716,8 +4742,16 @@ else if (LINE_IS_INVISIBLE(curline->lvl))
 else if (*curline->txt)                 /* otherwise                         */
   putlist(" ");                         /* prefix line with blank            */
 
-if (codeptr > 0)
+if (codeptr > 0 || printovr & PRINTOV_PADDR)
   putlist("%04X ", (unsigned short)(oldlc + ((dwOptions & OPTION_LPA) ? 0 : phase)));
+else if (printovr & PRINTOV_PLABEL)
+  putlist("%04X ", (unsigned short)lpLabel->value);
+else if (printovr & PRINTOV_PDP && dpsetting >= 0)
+  putlist("%02X   ", (unsigned short)dpsetting);
+else if (printovr & PRINTOV_PTFR)
+  putlist("%04X ", tfradr);
+else if (printovr & PRINTOV_PPHA)
+  putlist("%04X ", (unsigned short)phase);
 else if (*curline->txt)
   putlist("     ");
 else
@@ -5469,7 +5503,11 @@ struct relocrecord p = {0};
 char *s;
 
 skipspace();
+#if 1
+                                        /* always check for 6800             */
+#else
 if (dwOptions & OPTION_TSC)             /* if TSC mode, check for 6800       */
+#endif
   {
   s = srcptr;
   scanname();                           /* look whether followed by A or B   */
@@ -6292,6 +6330,7 @@ switch (co)
       break;
       }
 
+    printovr |= PRINTOV_PADDR;          /* print address in listing          */
     setlabel(lp);
     if (generating && pass == 2)
       {
@@ -6341,6 +6380,7 @@ switch (co)
         else
           lp->cat = SYMCAT_CONSTANT;
         lp->value = (unsigned short)operand;
+        printovr |= PRINTOV_PLABEL;
         }
       else
         error |= ERR_LABEL_MULT;
@@ -6659,7 +6699,10 @@ switch (co)
     if ((unsigned)operand > 255)
       operand = -1;
     if (absmode)
-      dpsetting = operand;              
+      {
+      dpsetting = operand;
+      printovr |= PRINTOV_PDP;
+      }
     else
       error |= ERR_RELOCATING;
     break;
@@ -6678,6 +6721,7 @@ switch (co)
         else
           lp->cat = SYMCAT_VARIABLE;
         lp->value = (unsigned short)operand;
+        printovr |= PRINTOV_PLABEL;
         }
       else
         error |= ERR_LABEL_MULT;
@@ -6695,7 +6739,10 @@ switch (co)
         if (error)                      /* if error in here                  */
           tfradr = 0;                   /* reset to zero                     */
         else                            /* otherwise                         */
+          {
           tfradrset = 1;                /* remember transfer addr. is set    */
+          printovr |= PRINTOV_PTFR;
+          }
         }
       }
                                         /* terminate current level           */
@@ -7045,10 +7092,12 @@ switch (co)
       }
     /* ... now act on operand! */
     phase = (int)operand - (int)loccounter;
+    printovr |= PRINTOV_PPHA;
     break;
   case PSEUDO_DEPHASE :                 /* DEPHASE ?                         */
     /* end last PHASE */
     phase = 0;
+    printovr |= PRINTOV_PPHA;
     break;
   case PSEUDO_PEMT :                    /* PEMT <text>                       */
     nRepNext = 0;                       /* reset eventual repeat             */
@@ -7481,6 +7530,7 @@ certain = 1;
 lp = 0;
 codeptr = 0;
 condline = 0;
+printovr = 0;
 
 if (inMacro)
   curline->lvl |= LINCAT_MACDEF;
