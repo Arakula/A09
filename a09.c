@@ -1,7 +1,7 @@
 /* A09, 6809 Assembler. 
    
    (C) Copyright 1993,1994 L.C. Benschop. 
-   Parts (C) Copyright 2001-2020 H. Seib.
+   Parts (C) Copyright 2001-2022 H. Seib.
    This version of the program is distributed under the terms and conditions 
    of the GNU General Public License version 2. See file the COPYING for details.   
    THERE IS NO WARRANTY ON THIS PROGRAM. 
@@ -301,6 +301,7 @@
    v1.53 2022-04-25 fix https://github.com/Arakula/A09/issues/11
    v1.54 2022-04-25 6800 alternative mnemonics are not TSC-specific any more 
    v1.55 2022-05-16 RMB,RZB et al. now get printed with offset in listing
+   v1.56 2022-07-18 FCW can now produce relocation table entries
 */
 
 /* @see https://stackoverflow.com/questions/2989810/which-cross-platform-preprocessor-defines-win32-or-win32-or-win32
@@ -330,8 +331,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.55"
-#define VERSNUM      "$0137"            /* can be queried as &VERSION        */
+#define VERSION      "1.56"
+#define VERSNUM      "$0138"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -2177,7 +2178,7 @@ return pNew;
 }
 
 /*****************************************************************************/
-/* expandfn : eventually expands a file name to full-blown path              */
+/* expandfn : expands a file name to full-blown path                         */
 /*****************************************************************************/
 
 char const *expandfn(char const *fn)
@@ -6501,11 +6502,16 @@ switch (co)
       generating = 1;
     do
       {
+      unsigned short us;
+
       if (*srcptr == ',')
         srcptr++;
       if (!(dwOptions & OPTION_TSC))
         skipspace();
-      putword((unsigned short)scanexpr(0, &p));
+      us = (unsigned short)scanexpr(0, &p);
+      p.addr = (unsigned short)(loccounter + codeptr);
+      putword(us);
+      addreloc(&p);
       if (unknown && pass == 2)
         error |= ERR_LABEL_UNDEF; 
       if (!(dwOptions & OPTION_TSC))
