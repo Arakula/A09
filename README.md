@@ -31,6 +31,8 @@ Hermann Seib, 2022
 <dl>
   <dt><b>-c</b></dt>
   <dd>suppresses code output (corresponds to ASMB's <b>B</b> command line option)</dd>
+  <dt><b>-u</b></dt>
+  <dd>shorthand notation for the <b>UEX</b> option (see below)</b></dd>
   <dt><b>-b<i>filename</i></b> (default output mode)</dt>
   <dd>create a binary output file<br>
   if no file name is given, the extension <b>.bin</b> is used (<b>.b</b> on 
@@ -293,6 +295,34 @@ This option makes it easier to create complex patches to be embedded in images p
   <tr>
     <td valign="top"><b>NDL *</b></td>
     <td>do not define labels on macro expansion</td>
+  </tr>
+  <tr bgcolor="#f0f0f0">
+    <td valign="top"><b>RED</b></td>
+    <td>allow redefinition of EQU statements to code/data labels <i>if</i> the value stays the same</td>
+  </tr>
+  <tr bgcolor="#f0f0f0">
+    <td valign="top"><b>NRD *</b></td>
+    <td>do not allow redefinition of EQU statements to code/data labels</td>
+  </tr>
+  <tr>
+    <td valign="top"><b>FBG *</b></td>
+    <td>fill gaps with the defined fill character in binary files</td>
+  </tr>
+  <tr>
+    <td valign="top"><b>NFB</b></td>
+    <td>do not fill gaps with the defined fill character in binary files<br />
+    <b>Note:</b> when used, A09 does not go back in the output file any more, so constructions like <br />
+    ORG $0100 (some code) ORG $0300 (some code) <b>ORG $0200</b> (some code)<br />
+    result in the code at $0200 to be <i>at the end</i> of the binary file.</td>
+  </tr>
+  <tr bgcolor="#f0f0f0">
+    <td valign="top"><b>UEX</b></td>
+    <td>automatically convert all undefined labels to external references if Flex9 RELASMB output is generated.<br />
+    This roughly corresponds to Flex9 RELASMB's U option. Setting this option is silently ignored in any other output mode.</td>
+  </tr>
+  <tr bgcolor="#f0f0f0">
+    <td valign="top"><b>NUE *</b></td>
+    <td>undefined labels are undefined labels and thus produce errors</td>
   </tr>
 </tbody></table>
 
