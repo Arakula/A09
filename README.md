@@ -1,7 +1,7 @@
 # A09 - 6800/6801/6809/6301/6309/68HC11 Assembler
 
 Copyright (c) 1993,1994 L.C. Benschop  
-Parts Copyright (c) 2001-2020 Hermann Seib
+Parts Copyright (c) 2001-2022 Hermann Seib
 
 
 Based on Lennart Benschop's C core that can be found somewhere on the 'net 
@@ -20,7 +20,7 @@ the Source, Luke!" principle if you just want to hack a little 6809 assembly
 program, I've added this documentation. Have fun!
 
 
-Hermann Seib, 2020
+Hermann Seib, 2022
 
 ## Syntax
 
