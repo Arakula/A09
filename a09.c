@@ -308,6 +308,8 @@
                     -u command line switch added for RELASMB compatibility
                     UEX|NUE* option added
                     Thanks to Dieter Deyke for RELASMB compatibility checks!
+   v1.58 2022-10-17 improved 68HC11 BSET/BCLR/BRSET/BRCLR parameter handling
+                    (no more need to use blanks as parameter separators)
 */
 
 /* @see https://stackoverflow.com/questions/2989810/which-cross-platform-preprocessor-defines-win32-or-win32-or-win32
@@ -338,8 +340,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.57"
-#define VERSNUM      "$0139"            /* can be queried as &VERSION        */
+#define VERSION      "1.58"
+#define VERSNUM      "$013A"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -2043,8 +2045,7 @@ struct regrecord *regtable = regtable09;/* used register table               */
                                         /* used bit register table           */
 struct regrecord *bitregtable = bitregtable09;
 int bitregtablesize = sizeof(bitregtable09) / sizeof(bitregtable09[0]);
-void scanoperands09(struct relocrecord *pp);
-void (*scanoperands)(struct relocrecord *) = scanoperands09;
+void (*scanoperands)(struct relocrecord *, int);
 
 char pass;                              /* Assembler pass = 1 or 2           */
 char relocatable = 0;                   /* relocatable object flag           */
@@ -2755,6 +2756,23 @@ return dest;
 }
 
 /*****************************************************************************/
+/* parsespace : parses whitespace characters                                 */
+/*****************************************************************************/
+
+char parsespace(char *srcptr, char **nextptr)
+{
+char c, lblk = 0;
+while ((c = *srcptr) == ' ' || c == '\t')
+  {
+  if (lblk < 127)
+    lblk++;
+  srcptr++;
+  }
+*nextptr = srcptr;
+return lblk; /* return whether (and approx. how many) leading blanks skipped */
+}
+
+/*****************************************************************************/
 /* settext : sets a text symbol                                              */
 /*****************************************************************************/
 
@@ -3067,14 +3085,7 @@ parsename(srcptr, &srcptr);             /* parse with global pointer         */
 
 char skipspace()
 {
-char c, lblk = 0;
-while ((c = *srcptr) == ' ' || c == '\t')
-  {
-  if (lblk < 127)
-    lblk++;
-  srcptr++;
-  }
-return lblk; /* return whether (and approx. how many) leading blanks skipped */
+return parsespace(srcptr, &srcptr);
 } 
 
 /*****************************************************************************/
@@ -3714,7 +3725,7 @@ else
 
 #define RESTORE { srcptr = oldsrcptr; c = *srcptr; goto dodefault; }
 
-void scanoperands09(struct relocrecord *pp)
+void scanoperands09(struct relocrecord *pp, int endc)
 {
 char c, *oldsrcptr;
 unsigned char accpost, h63 = 0;
@@ -3860,7 +3871,7 @@ if (pass == 2 && unknown)
   error |= ERR_LABEL_UNDEF; 
 }
 
-void scanoperands00(struct relocrecord *pp)
+void scanoperands00(struct relocrecord *pp, int endc)
 {
 char c, *s = srcptr;
 
@@ -3941,9 +3952,9 @@ if (pass == 2 && unknown)
   error |= ERR_LABEL_UNDEF; 
 }
 
-void scanoperands11(struct relocrecord *pp)
+void scanoperands11(struct relocrecord *pp, int endc)
 {
-char c, *s = srcptr;
+char c, *s = srcptr, *next;
 
 unknown = 0;
 opsize = 0;
@@ -3952,23 +3963,6 @@ operand = 0;
 skipspace();
 c = *srcptr;
 mode = ADRMODE_IMM;
-
-/*
-What's still sorely missing here:
-something to catch the first part of the bit mask stuff in constructs like
-  addr,[#]mask
-  addr,[#]mask,target
-where processing should stop after addr
-and
-  [[off],]indexreg,[#]mask
-  [[off],]indexreg,[#]mask,target
-where processing should stop after indexreg.
-Until then, it's only possible to specify them like
-  addr [#]mask
-  addr [#]mask,target
-  [[off],]indexreg [#]mask
-  [[off],]indexreg [#]mask target
-*/
 
 switch (toupper(c))
   {
@@ -4042,9 +4036,31 @@ switch (toupper(c))
     operand = scanexpr(0, pp);
     if (!(dwOptions & OPTION_TSC))
       skipspace();
+#if 1
     if (*srcptr == ',')
-      goto Indexed;
+      {
+      if (!endc)
+        goto Indexed;
+      next = srcptr + 1;                /* if endc, parse ahead ...          */
+      if (!(dwOptions & OPTION_TSC))
+        parsespace(next, &next);
+      parsename(next, &next);
+      if (!strcmp(unamebuf, "X") ||     /* if it's "X" or "Y",               */
+          !strcmp(unamebuf, "Y"))       /* or "Y" alone                      */
+        {
+        srcptr = next;
+        goto IdxWithout;                /* process index argument            */
+        }
+      /* otherwise end parsing here */
+      }
+#else
+    if (*srcptr == ',')
+      {
+      if (!endc)
+        goto Indexed;
+      }
     else
+#endif
       {
       if (opsize == 0)
         {
@@ -5189,7 +5205,7 @@ void oneimm(int co)
 {
 struct relocrecord p = {0};
 
-scanoperands(&p);
+scanoperands(&p, 0);
 if (mode >= ADRMODE_POST)
   error |= ERR_ILLEGAL_ADDR;
 putbyte((unsigned char)co);
@@ -5208,7 +5224,7 @@ void lea(int co)
 struct relocrecord p = {0};
 
 onebyte((unsigned char)co);
-scanoperands(&p);
+scanoperands(&p, 0);
 if (mode == ADRMODE_IMM)
   error |= ERR_ILLEGAL_ADDR;
 if (mode < ADRMODE_POST)
@@ -5229,7 +5245,7 @@ void sbranch(int co)
 struct relocrecord p = {0};
 int offs;
 
-scanoperands(&p);
+scanoperands(&p, 0);
 if (mode != ADRMODE_DIR && mode != ADRMODE_EXT)
   error |= ERR_ILLEGAL_ADDR;
 offs = (unsigned short)operand - (loccounter + phase) - 2;
@@ -5250,7 +5266,7 @@ void lbra(int co)
 struct relocrecord p = {0};
 int nDiff;
 
-scanoperands(&p);
+scanoperands(&p, 0);
 if (mode != ADRMODE_DIR && mode != ADRMODE_EXT)
   error |= ERR_ILLEGAL_ADDR;
 putbyte((unsigned char)co);
@@ -5271,7 +5287,7 @@ void lbranch(int co)
 struct relocrecord p = {0};
 int nDiff;
 
-scanoperands(&p);
+scanoperands(&p, 0);
 if (mode != ADRMODE_DIR && mode != ADRMODE_EXT)
   error |= ERR_ILLEGAL_ADDR;
 putword((unsigned short)co);
@@ -5290,7 +5306,7 @@ void arith(int co, char noimm)
 {
 struct relocrecord p = {0};
 
-scanoperands(&p);
+scanoperands(&p, 0);
 switch (mode)
   {
   case ADRMODE_IMM :
@@ -5377,7 +5393,7 @@ void idxextarith(int co)
 {
 struct relocrecord p = {0};
 
-scanoperands(&p);
+scanoperands(&p, 0);
 switch (mode)
   {
   case ADRMODE_IMM :
@@ -5406,7 +5422,7 @@ void darith(int co, char noimm)
 {
 struct relocrecord p = {0};
 
-scanoperands(&p);
+scanoperands(&p, 0);
 switch (mode)
   {
   case ADRMODE_IMM :
@@ -5458,7 +5474,7 @@ void d2arith(int co, char noimm)
 {
 struct relocrecord p = {0};
 
-scanoperands(&p);
+scanoperands(&p, 0);
 switch (mode)
   {
   case ADRMODE_IMM :
@@ -5487,7 +5503,7 @@ void qarith(int co, char noimm)
 {
 struct relocrecord p = {0};
 
-scanoperands(&p);
+scanoperands(&p, 0);
 switch (mode)
   {
   case ADRMODE_IMM :
@@ -5539,7 +5555,7 @@ if ((dwOptions & OPTION_TSC) &&         /* if TSC mode, check for 6800       */
   srcptr = s;
   }
 
-scanoperands(&p);
+scanoperands(&p, 0);
 switch (mode)
   {
   case ADRMODE_IMM :
@@ -5590,7 +5606,7 @@ if (dwOptions & OPTION_TSC)             /* if TSC mode, check for 6800       */
   srcptr = s;
   }
 
-scanoperands(&p);
+scanoperands(&p, 0);
 switch (mode)
   {
   case ADRMODE_IMM :
@@ -5702,7 +5718,7 @@ if (!(dwOptions & OPTION_TSC))
   skipspace();
 if (*srcptr++ != ',')
   error |= ERR_EXPR;
-scanoperands(&p);
+scanoperands(&p, 0);
 
 /* HD6301/6303 can handle Immediate and Indexed addressing, whereas
    HD6309 can handle Immediate, Extended and Indexed addressing */
@@ -5781,7 +5797,7 @@ if (*srcptr == ',')
   srcptr++;
 else
  error |= ERR_ILLEGAL_ADDR;
-scanoperands(&rp);
+scanoperands(&rp, 0);
 switch (mode)
   {
   case ADRMODE_DIR :
@@ -5875,10 +5891,10 @@ struct relocrecord p = {0};
 long mask = -1;
 
 /* expected:
-   dir [#]mask
-   [[off],]indexreg [#]mask */
+   dir [#]mask               |  dir,[#]mask
+   [[off],]indexreg [#]mask  |  [[off],]indexreg,[#]mask */
 
-scanoperands(&p);                       /* get 1st part (dir/index)          */
+scanoperands(&p, 1);                    /* get 1st part (dir/index)          */
 
 if (*srcptr == ',' ||                   /* either , or ' ' is valid          */
     *srcptr == ' ')
@@ -5919,10 +5935,10 @@ long mask = -1;
 int offs;
 
 /* expected:
-   dir [#]mask target
-   [[off],]indexreg [#]mask target */
+   dir [#]mask target  |  dir,[#]mask,target
+   [[off],]indexreg [#]mask target  |  [[off],]indexreg,[#]mask,target */
 
-scanoperands(&p);
+scanoperands(&p, 1);
 
 if (*srcptr == ',' ||                   /* either , or ' ' is valid          */
     *srcptr == ' ')
@@ -5947,7 +5963,7 @@ long s_operand = operand;
 char s_unknown = unknown;
 char s_certain = certain;
 unsigned char s_postbyte = postbyte;
-scanoperands(&pj);
+scanoperands(&pj, 0);
 if (mode != ADRMODE_DIR && mode != ADRMODE_EXT)
   error |= ERR_ILLEGAL_ADDR;
 offs = (unsigned short)operand - (loccounter + phase) - 4;
@@ -8189,6 +8205,8 @@ int main (int argc, char *argv[])
 {
 int i;
 struct linebuf *pLastLine = NULL;
+
+scanoperands = scanoperands09;
 
 settext("ASM", "A09");                  /* initialize predefined texts       */
 settext("VERSION", VERSNUM);
