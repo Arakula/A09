@@ -310,6 +310,10 @@
                     Thanks to Dieter Deyke for RELASMB compatibility checks!
    v1.58 2022-10-17 improved 68HC11 BSET/BCLR/BRSET/BRCLR parameter handling
                     (no more need to use blanks as parameter separators)
+   v1.59 2022-10-18 improved handling of hex, octal, and binary constants;
+                    TEXT prepends the label with '&' now to keep text labels
+                    separate from normal ones. This reduces the maximum length
+                    of TEXT names to 31. Still enough, I think ...
 */
 
 /* @see https://stackoverflow.com/questions/2989810/which-cross-platform-preprocessor-defines-win32-or-win32-or-win32
@@ -340,8 +344,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.58"
-#define VERSNUM      "$013A"            /* can be queried as &VERSION        */
+#define VERSION      "1.59"
+#define VERSNUM      "$013B"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -1675,7 +1679,12 @@ struct symrecord
     long flags;                         /* forward reference flag (otherwise)*/
     } u;
   };
-                
+
+struct symtable
+  {
+  long counter;                         /* # entries in table                */
+  struct symrecord rec[MAXLABELS];      /* symbol records (fixed size)       */
+  };
                                         /* symbol categories :               */
 #define SYMCAT_CONSTANT       0x00      /* constant value (from equ)         */
 #define SYMCAT_VARIABLE       0x01      /* variable value (from set)         */
@@ -1701,10 +1710,8 @@ struct symrecord
 #define SYMFLAG_PASSED        0x02      /* passed forward reference          */
 #define SYMFLAG_ABSOLUTE      0x04      /* absolute public label             */
 
-long symcounter = 0;                    /* # currently loaded symbols        */
-struct symrecord symtable[MAXLABELS];   /* symbol table (fixed size)         */
-long lclcounter = 0;                    /* # currently loaded local symbols  */
-struct symrecord lcltable[MAXLABELS];   /* local symbol table (fixed size)   */
+struct symtable symtable = {0};         /* symbol table                      */
+struct symtable lcltable = {0};         /* local symbol table (fixed size)   */
   
 /*****************************************************************************/
 /* regrecord structure definition                                            */
@@ -2123,6 +2130,10 @@ int printovr = 0;                       /* print override flags:             */
 #define OUT_REL   5                     /* Flex9 RELASMB output              */
 int outmode = OUT_BIN;                  /* default to binary output          */
 
+int hexmaxcount = 16;                   /* max. # bytes per S09 line         */
+int ihexmaxcount = 32;                  /* max. # bytes per Intel hex line   */
+int iflexmaxcount = 255;                /* max. # bytes per Flex09 record    */
+
 unsigned short hexaddr;
 int hexcount;
 unsigned char hexbuffer[256];
@@ -2342,25 +2353,25 @@ if ((!sym) ||                           /* if no main symbol for that        */
   return sym;                           /* pass back main symbol             */
 
 lo = 0;                                 /* do binary search for the thing    */
-hi = lclcounter - 1;
+hi = lcltable.counter - 1;
 s = 1;
 i = 0;
 while (hi >= lo)
   {
-  i = (lo + hi) / 2;
-  s = lcltable[i].value - loccounter;   /* binary search for current address */
+  i = (lo + hi) / 2;                    /* binary search for current address */
+  s = lcltable.rec[i].value - loccounter;
   if (s < 0)
     lo = i + 1;
   else if (s > 0)
     hi = i - 1;
   else                                  /* if found,                         */
     {                                   /* go to 1st of this value           */
-    while ((i) && (lcltable[i - 1].value == loccounter))
+    while ((i) && (lcltable.rec[i - 1].value == loccounter))
       i--;
-    while ((i < lclcounter) &&          /* search for the NAME now           */
-           (lcltable[i].value == loccounter))
+    while ((i < lcltable.counter) &&    /* search for the NAME now           */
+           (lcltable.rec[i].value == loccounter))
       {
-      s = strcmp(sym->name, lcltable[i].name);
+      s = strcmp(sym->name, lcltable.rec[i].name);
       if (s <= 0)
         {
         if (s)
@@ -2371,10 +2382,10 @@ while (hi >= lo)
       }
     if (s)                              /* if not found, re-set              */
       {
-      if (i >= lclcounter)
+      if (i >= lcltable.counter)
         s = 1;
       else
-        s = lcltable[i].value - loccounter;
+        s = lcltable.rec[i].value - loccounter;
       }
     break;
     }
@@ -2384,12 +2395,12 @@ if (insert)                             /* if inserting,                     */
   {
   if (!s)                               /* if address is already in use      */
     {                                   /* but not the correct label         */
-    if (strcmp(sym->name, lcltable[i].name))
+    if (strcmp(sym->name, lcltable.rec[i].name))
       error |= ERR_LABEL_MULT;          /* set error                         */
-    return lcltable + i;                /* return the local symbol           */
+    return lcltable.rec + i;            /* return the local symbol           */
     }
   i = (s < 0 ? i + 1 : i);
-  if (lclcounter == MAXLABELS)
+  if (lcltable.counter == MAXLABELS)
     {
     printf("%s(%ld): error 25: out of local symbol storage\n",
            expandfn(curline->fn), curline->ln);
@@ -2398,24 +2409,24 @@ if (insert)                             /* if inserting,                     */
     exit(4);
     }
   sym->cat = SYMCAT_LOCALLABEL;
-  for (j = lclcounter; j > i; j--)
-    lcltable[j] = lcltable[j - 1];
-  lclcounter++;
-  strcpy(lcltable[i].name, sym->name);
-  lcltable[i].cat = SYMCAT_LOCALLABEL;
-  lcltable[i].value = loccounter;
-  lcltable[i].u.parent = NULL;
-  return lcltable + i;                  /* pass back this symbol             */
+  for (j = lcltable.counter; j > i; j--)
+    lcltable.rec[j] = lcltable.rec[j - 1];
+  lcltable.counter++;
+  strcpy(lcltable.rec[i].name, sym->name);
+  lcltable.rec[i].cat = SYMCAT_LOCALLABEL;
+  lcltable.rec[i].value = loccounter;
+  lcltable.rec[i].u.parent = NULL;
+  return lcltable.rec + i;              /* pass back this symbol             */
   }
 
 if (forward)                            /* if forward search                 */
   {
   i = (s < 0 ? i - 1 : i);
-  for (; i < lclcounter; i++)
+  for (; i < lcltable.counter; i++)
     {
-    if ((!strcmp(lcltable[i].name, sym->name)) &&
-        (lcltable[i].value > loccounter))
-      return lcltable + i;
+    if ((!strcmp(lcltable.rec[i].name, sym->name)) &&
+        (lcltable.rec[i].value > loccounter))
+      return lcltable.rec + i;
     }
   }
 else                                    /* if backward search                */
@@ -2423,9 +2434,9 @@ else                                    /* if backward search                */
   i = (s > 0 ? i + 1 : i);
   for (; i >= 0; i--)
     {
-    if ((!strcmp(lcltable[i].name, sym->name)) &&
-        (lcltable[i].value <= loccounter))
-      return lcltable + i;
+    if ((!strcmp(lcltable.rec[i].name, sym->name)) &&
+        (lcltable.rec[i].value <= loccounter))
+      return lcltable.rec + i;
     }
   }
 
@@ -2472,13 +2483,13 @@ if (i)                                  /* if starting with number           */
   }
 
 lo = 0;                                 /* do binary search for the thing    */
-hi = symcounter - 1;
+hi = symtable.counter - 1;
 s = 1;
 i = 0;
 while (hi >= lo)
   {
   i = (lo + hi) / 2;
-  s = strcmp(symtable[i].name, name);
+  s = strcmp(symtable.rec[i].name, name);
   if (s < 0)
     lo = i + 1;
   else if (s > 0)
@@ -2493,7 +2504,7 @@ if (s)                                  /* if symbol not found               */
     return NULL;                        /* return without pointer            */
 
   i = (s < 0 ? i + 1 : i);
-  if (symcounter == MAXLABELS)
+  if (symtable.counter == MAXLABELS)
     {
     printf("%s(%ld): error 23: out of symbol storage\n",
            expandfn(curline->fn), curline->ln);
@@ -2501,25 +2512,25 @@ if (s)                                  /* if symbol not found               */
       putlist( "*** Error 23: out of symbol storage\n");
     exit(4);
     }
-  if (commonsym >= symtable + i)
+  if (commonsym >= symtable.rec + i)
     commonsym++;
-  for (j = 0; j < symcounter; j++)
-    if (symtable[j].u.parent >= symtable + i)
-      symtable[j].u.parent++;
-  for (j = symcounter; j > i; j--)
-    symtable[j] = symtable[j-1];
-  symcounter++;
-  strcpy(symtable[i].name, name);
-  symtable[i].cat = (islocal) ? SYMCAT_EMPTYLOCAL : SYMCAT_EMPTY;
-  symtable[i].value = 0;
-  symtable[i].u.flags = 0;
+  for (j = 0; j < symtable.counter; j++)
+    if (symtable.rec[j].u.parent >= symtable.rec + i)
+      symtable.rec[j].u.parent++;
+  for (j = symtable.counter; j > i; j--)
+    symtable.rec[j] = symtable.rec[j-1];
+  symtable.counter++;
+  strcpy(symtable.rec[i].name, name);
+  symtable.rec[i].cat = (islocal) ? SYMCAT_EMPTYLOCAL : SYMCAT_EMPTY;
+  symtable.rec[i].value = 0;
+  symtable.rec[i].u.flags = 0;
   }
 
 if (islocal)                            /* if searching for a local label    */
-  return findlocal(symtable + i,        /* search for the local label        */
+  return findlocal(symtable.rec + i,    /* search for the local label        */
                    forward, (islocal < 2));
 
-return symtable + i;                    /* return the found or inserted sym  */
+return symtable.rec + i;                /* return the found or inserted sym  */
 }  
 
 /*****************************************************************************/
@@ -2530,13 +2541,13 @@ char *findsymat(unsigned short addr)
 {
 /* since the symbol table is sorted by name, this needs a sequential search  */
 int i;
-for (i = 0; i < symcounter; i++) 
-  if (symtable[i].cat != SYMCAT_EMPTY)
+for (i = 0; i < symtable.counter; i++) 
+  if (symtable.rec[i].cat != SYMCAT_EMPTY)
     {
-    if (symtable[i].cat == SYMCAT_TEXT)
+    if (symtable.rec[i].cat == SYMCAT_TEXT)
       continue;
-    if (symtable[i].value == addr)
-      return symtable[i].name;
+    if (symtable.rec[i].value == addr)
+      return symtable.rec[i].name;
     }
 return NULL;
 }
@@ -2622,13 +2633,29 @@ if (nextptr)
 
 long parsedecimal(char *srcptr, char **nextptr)
 {
-char c = *srcptr++;
-long t = 0;
+char c;
+long t = 0, mult = 1;
+int i = 0;
+
+c = *srcptr++;
+#if 0
+/* since decimals don't have a leading indicator, '-' should already have been
+   processed by scanfactor() / scanexpr() */
+while (c == '-')
+  {
+  mult = -mult;
+  c = *srcptr++;
+  }
+#endif
 while (isdigit(c))
   {
+  i++;
   t = t * 10 + c - '0';
   c = *srcptr++;
   }
+t *= mult;
+if (i == 0)
+  error |= ERR_EXPR;
 if (nextptr)
   *nextptr = --srcptr;
 return t;
@@ -2640,20 +2667,33 @@ return t;
 
 long parsehex(char *srcptr, char **nextptr)
 {
-long t = 0, i = 0;
+char c;
+int i = 0;
+long t = 0, mult = 1;
 
-parsename(++srcptr, &srcptr);           /* parse skipping leading $          */
-while (unamebuf[i] >= '0' && unamebuf[i] <= 'F')
+srcptr++;                               /* skip $                            */
+while (*srcptr == '-')
   {
-  t = t * 16 + unamebuf[i] - '0';
-  if (unamebuf[i] > '9')
-    t -= 7;
+  mult = -mult;
+  srcptr++;
+  }
+c = toupper(*srcptr++);
+while ((c >= '0' && c <= '9') ||
+       (c >= 'A' && c <= 'F'))
+  {
   i++;
+  if (c >= '0' && c <= '9')
+    c -= '0';
+  else
+    c -= ('A' - 10);
+  t = t * 16 + c;
+  c = toupper(*srcptr++);
   }  
+t *= mult;
 if (i == 0)
   error |= ERR_EXPR;
 if (nextptr)
-  *nextptr = srcptr;
+  *nextptr = --srcptr;
 return t;
 }
 
@@ -2681,15 +2721,25 @@ return t;
 long parsebin(char *srcptr, char **nextptr)
 {
 char c;
-short t = 0;
+int i = 0;
+long t = 0, mult = 1;
 
 srcptr++;                               /* skip %                            */
+while (*srcptr == '-')
+  {
+  mult = -mult;
+  srcptr++;
+  }
 c = *srcptr++;
 while (c == '0' || c == '1')
   {
+  i++;
   t = t * 2 + c - '0';
   c = *srcptr++;
   }
+t *= mult;
+if (i == 0)
+  error |= ERR_EXPR;
 if (nextptr)
   *nextptr = --srcptr;
 return t;
@@ -2702,15 +2752,25 @@ return t;
 long parseoct(char *srcptr, char **nextptr)
 {
 char c;
-long t = 0;
+int i = 0;
+long t = 0, mult = 1;
 
 srcptr++;                               /* skip @                            */
+while (*srcptr == '-')
+  {
+  mult = -mult;
+  srcptr++;
+  }
 c = *srcptr++;
 while (c >= '0' && c <= '7')
   {
+  i++;
   t = t * 8 + c - '0';
   c = *srcptr++;
   }
+t *= mult;
+if (i == 0)
+  error |= ERR_EXPR;
 if (nextptr)
   *nextptr = --srcptr;
 return t;
@@ -2779,7 +2839,21 @@ return lblk; /* return whether (and approx. how many) leading blanks skipped */
 int settext(char *namebuf, char *text)
 {
 struct symrecord *lp = findsym(namebuf, 1);
+char iname[sizeof(lp->name)];
 
+if (!namebuf)
+  {
+  error |= ERR_LABEL_UNDEF;
+  return -1;
+  }
+/* to keep texts separate from the normal labels' way, prepend them with &   */
+if (*namebuf != '&')
+  {
+  sprintf(iname, "&%.*s", (int)(sizeof(iname) - 2), namebuf);
+  namebuf = iname;
+  }
+
+lp = findsym(namebuf, 1);
 if (!lp)
   {
   error |= ERR_LABEL_UNDEF;
@@ -2854,24 +2928,29 @@ else
   putlist("\n");
 
 putlist("%sSYMBOL TABLE", (dwOptions & OPTION_LPA) ? "* " : "");
-for (i = 0; i < symcounter; i++) 
-  if (symtable[i].cat != SYMCAT_EMPTY)
+for (i = 0; i < symtable.counter; i++) 
+  if (symtable.rec[i].cat != SYMCAT_EMPTY)
     {
                                         /* suppress listing of predef texts  */
-    if ((symtable[i].cat == SYMCAT_TEXT) &&
-        (symtable[i].value < nPredefinedTexts))
+    if ((symtable.rec[i].cat == SYMCAT_TEXT)
+#if 1
+/* not really necessary. OPT TXT can be used to output these. */
+        && (symtable.rec[i].value < nPredefinedTexts)
+#endif
+        )
       continue;
                                         /* if local label                    */
-    if (symtable[i].cat == SYMCAT_LOCALLABEL)
+    if (symtable.rec[i].cat == SYMCAT_LOCALLABEL)
       {
       int k;                            /* walk local label list             */
-      for (k = 0; k < lclcounter; k++)
-        if (!strcmp(lcltable[k].name, symtable[i].name))
+      for (k = 0; k < lcltable.counter; k++)
+        if (!strcmp(lcltable.rec[k].name, symtable.rec[i].name))
           {
           if (j % 4 == 0)
             putlist("\n%s", (dwOptions & OPTION_LPA) ? "* " : "");
-          putlist( " %9s %02d %04X", lcltable[k].name, lcltable[k].cat,
-                                     lcltable[k].value); 
+          putlist( " %9s %02d %04X", lcltable.rec[k].name,
+                                     lcltable.rec[k].cat,
+                                     lcltable.rec[k].value); 
           j++;
           }
       }
@@ -2879,8 +2958,9 @@ for (i = 0; i < symcounter; i++)
       {
       if (j % 4 == 0)
         putlist("\n%s", (dwOptions & OPTION_LPA) ? "* " : "");
-      putlist( " %9s %02d %04X", symtable[i].name, symtable[i].cat,
-                                 symtable[i].value); 
+      putlist( " %9s %02d %04X", symtable.rec[i].name,
+                                 symtable.rec[i].cat,
+                                 symtable.rec[i].value); 
       j++;
       }
     }
@@ -2940,14 +3020,14 @@ else
   putlist("\n");
 
 putlist("%sTEXT TABLE", (dwOptions & OPTION_LPA) ? "* " : "");
-for (i = 0; i < symcounter; i++) 
-  if (symtable[i].cat == SYMCAT_TEXT)
+for (i = 0; i < symtable.counter; i++) 
+  if (symtable.rec[i].cat == SYMCAT_TEXT)
     {
                                         /* suppress listing of predef texts  */
-    if (symtable[i].value < nPredefinedTexts)
+    if (symtable.rec[i].value < nPredefinedTexts)
       continue;
     putlist("\n%s %9s %s", (dwOptions & OPTION_LPA) ? "* " : "",
-            symtable[i].name, texts[symtable[i].value]); 
+            symtable.rec[i].name, texts[symtable.rec[i].value]); 
     j++;
     }
 putlist("\n%s%d TEXTS\n", (dwOptions & OPTION_LPA) ? "* " : "", j);
@@ -4185,8 +4265,8 @@ if (wcommon)
 else                                    /* calculate & write out global size */
   {
   int globals = 0;
-  for (i = 0; i < symcounter; i++)
-    if (symtable[i].cat == SYMCAT_PUBLIC)
+  for (i = 0; i < symtable.counter; i++)
+    if (symtable.rec[i].cat == SYMCAT_PUBLIC)
       globals++;
   globals *= 12;
   fputc((unsigned char)(globals >> 8), objfile);
@@ -4236,23 +4316,23 @@ void writerelcommon()
 int i, j;
 char name[9];
                                         /* work through symbol list          */
-for (i = 0; i < symcounter; i++)
-  {
-  if (symtable[i].cat == SYMCAT_COMMON) /* if that is a common block         */
+for (i = 0; i < symtable.counter; i++)
+  {                                     /* if that is a common block         */
+  if (symtable.rec[i].cat == SYMCAT_COMMON)
     {
-    commonsym = symtable + i;           /* write it out                      */
+    commonsym = symtable.rec + i;       /* write it out                      */
     writerelhdr(1);
                                         /* then write the global definition  */
-    sprintf(name, "%-8.8s", symtable[i].name);
+    sprintf(name, "%-8.8s", symtable.rec[i].name);
     // strupr(name);
     fwrite(name, 1, 8, objfile);
     fputc(1, objfile);                  /* unknown data                      */
-    fputc((unsigned char)(symtable[i].value >> 8), objfile);
-    fputc((unsigned char)(symtable[i].value & 0xFF), objfile);
+    fputc((unsigned char)(symtable.rec[i].value >> 8), objfile);
+    fputc((unsigned char)(symtable.rec[i].value & 0xFF), objfile);
     fputc(0x13, objfile);               /* unknown flag                      */
 
                                         /* then write the Common name        */
-    sprintf(name, "%-.8s", symtable[i].name);
+    sprintf(name, "%-.8s", symtable.rec[i].name);
     // strupr(name);
     for (j = 0; name[j]; j++)
       fputc(name[j], objfile);
@@ -4311,23 +4391,23 @@ void writerelglobal()
 int i;
 char name[9];
 
-for (i = 0; i < symcounter; i++)        /* write out the global data         */
+for (i = 0; i < symtable.counter; i++)  /* write out the global data         */
   {
-  if (symtable[i].cat == SYMCAT_PUBLIC)
+  if (symtable.rec[i].cat == SYMCAT_PUBLIC)
     {
     int flag2 = 0x02;                   /* start with GLOBAL flag            */
                                         /* add ABSOLUTE if necessary         */
-    if (symtable[i].u.flags & SYMFLAG_ABSOLUTE)
+    if (symtable.rec[i].u.flags & SYMFLAG_ABSOLUTE)
       flag2 |= 0x10;
 
-    sprintf(name, "%-8.8s", symtable[i].name);
+    sprintf(name, "%-8.8s", symtable.rec[i].name);
     // strupr(name);
     fwrite(name, 1, 8, objfile);
 
     fputc(0, objfile);                  /* unknown data                      */
 
-    fputc((unsigned char)(symtable[i].value >> 8), objfile);
-    fputc((unsigned char)(symtable[i].value & 0xFF), objfile);
+    fputc((unsigned char)(symtable.rec[i].value >> 8), objfile);
+    fputc((unsigned char)(symtable.rec[i].value & 0xFF), objfile);
 
     fputc(flag2, objfile);              /* unknown flag                      */
     }
@@ -4436,7 +4516,7 @@ if (hexcount)
 
 void outhex (unsigned char x) 
 {
-if (hexcount == 16)
+if (hexcount == hexmaxcount)
   flushhex();
 hexbuffer[hexcount++] = x;
 chksum += x;
@@ -4448,7 +4528,7 @@ chksum += x;
 
 void outihex (unsigned char x) 
 {
-if (hexcount == 32)
+if (hexcount == ihexmaxcount)
   flushihex();
 hexbuffer[hexcount++] = x;
 chksum += x;
@@ -4460,7 +4540,7 @@ chksum += x;
 
 void outflex(unsigned char x)
 {
-if (hexcount == 255)                    /* if buffer full                    */
+if (hexcount == iflexmaxcount)          /* if buffer full                    */
   flushflex();                          /* flush it                          */
 hexbuffer[hexcount++] = x;              /* then put byte into buffer         */
 }
@@ -6050,9 +6130,11 @@ for (p = curline->txt; (*p) && (j < LINELEN); )
   else if (*p == '&' && (p[1] < '0' || p[1] > '9'))
     {
     struct symrecord *lp;
+    char iname[sizeof(namebuf)];
     srcptr = p + 1;
     scanname();
-    lp = findsym(namebuf, 0);
+    sprintf(iname, "&%.*s", (int)(sizeof(iname) - 2), namebuf);
+    lp = findsym(iname, 0);
     if (lp && *namebuf &&               /* if symbol IS a text constant,     */
         (lp->cat == SYMCAT_TEXT))
       {                                 /* insert its content                */
@@ -7404,9 +7486,11 @@ while (pmac)                            /* walk through the macro lines      */
       else
         {
         struct symrecord *lp;
+        char iname[sizeof(namebuf)];
         char *nc;
         parsename(s + 1, &nc);
-        lp = findsym(namebuf, 0);
+        sprintf(iname, "&%.*s", (int)(sizeof(iname) - 2), namebuf);
+        lp = findsym(iname, 0);
         if (lp && *namebuf &&           /* if symbol IS a text constant,     */
             (lp->cat == SYMCAT_TEXT))
           {                             /* insert its content                */
@@ -8286,14 +8370,14 @@ reldataorg = -2;
 reldatasize = 0;
 g_termflg = -1;
 memset(bUsedBytes, 0, sizeof(bUsedBytes));
-for (i = 0; i < symcounter; i++)        /* reset all PASSED flags            */
-  if (symtable[i].cat != SYMCAT_COMMONDATA)
-    symtable[i].u.flags &= ~SYMFLAG_PASSED;
+for (i = 0; i < symtable.counter; i++)   /* reset all PASSED flags            */
+  if (symtable.rec[i].cat != SYMCAT_COMMONDATA)
+    symtable.rec[i].u.flags &= ~SYMFLAG_PASSED;
 if (dwOptions & OPTION_UEX)
-  {
-  for (i = 0; i < symcounter; i++)      /* make all undefined symbols extern */
-    if (symtable[i].cat == SYMCAT_UNRESOLVED)
-      symtable[i].cat = SYMCAT_EXTERN;
+  {                                     /* make all undefined symbols extern */
+  for (i = 0; i < symtable.counter; i++)
+    if (symtable.rec[i].cat == SYMCAT_UNRESOLVED)
+      symtable.rec[i].cat = SYMCAT_EXTERN;
   }
 
 if (listing & LIST_ON)

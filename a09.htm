@@ -371,7 +371,7 @@ of these programs). Apart from these, it knows the following directives:</p>
   <tr>
     <td valign="top"><b>IFD, IFND <i>symbol</i>[,<i>skipcount</i>]</b></td>
 	<td valign="top">assembles the block up to the next <b>ELSE</b> or <b>ENDIF</b>
-	directive if the symbol is (not) defined.<br>
+	directive if the symbol is (not) defined.<br />
 	<b>Attention:</b> this directive is a little bit dangerous - if the symbol is defined
 	<i>after</i> the <b>IF(N)D</b> directive, phasing errors can occur!</td>
   </tr>
@@ -418,6 +418,7 @@ of these programs). Apart from these, it knows the following directives:</p>
     (40-2000). If the <b>NCL</b> option is selected, A09 ignores the line width (default 
     is 80).</td>
   </tr>
+  <tr>
     <td valign="top"><b>SETPG <i>nnn</i></b></td>
     <td valign="top">sets the page length for paginated listings (see the <b>PAG</b> option 
     in the ASMB documentation); <b><i>nnn</i></b> is the number of lines that 
@@ -461,6 +462,8 @@ of these programs). Apart from these, it knows the following directives:</p>
         <td>filler character used for RMB areas in binary output files; defaults to <b>$00</b></td>
       </tr>
     </table>
+    <p>Please note that TEXT labels are internally stored with a preceding '&amp;' to keep them separate
+       from normal labels, so the maximum length of a TEXT label is 31.</p>
     </td>
   </tr>
   <tr>
