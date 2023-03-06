@@ -2886,7 +2886,7 @@ texts[lp->value] = (char *)malloc(strlen(text) + 1);
 if (texts[lp->value])
   strcpy(texts[lp->value], text);
 
-if (!strcmp(namebuf, "FILCHR"))         /* special for FILCHR : set internal */
+if (!strcmp(namebuf, "&FILCHR"))         /* special for FILCHR : set internal */
   {                                     /* byte                              */
   switch (text[0])
     {
