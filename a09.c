@@ -310,10 +310,14 @@
                     Thanks to Dieter Deyke for RELASMB compatibility checks!
    v1.58 2022-10-17 improved 68HC11 BSET/BCLR/BRSET/BRCLR parameter handling
                     (no more need to use blanks as parameter separators)
-   v1.59 2022-10-18 improved handling of hex, octal, and binary constants;
+   v1.59 2022-10-19 improved handling of hex, octal, and binary constants;
                     TEXT prepends the label with '&' now to keep text labels
                     separate from normal ones. This reduces the maximum length
                     of TEXT names to 31. Still enough, I think ...
+                    Further RELASMB compatibility improvements
+   v1.60 2023-07-04 previous version ruined the FILCHR option; corrected. See
+                         https://github.com/Arakula/A09/issues/13
+                       for details.
 */
 
 /* @see https://stackoverflow.com/questions/2989810/which-cross-platform-preprocessor-defines-win32-or-win32-or-win32
@@ -1655,6 +1659,7 @@ struct oprecord optable11[]=
    bit 4 indicates this can't be relocated if it's an address.
    bit 5 indicates address (if any) is negative.
    bit 6 indicates a single-byte external (if set with bit 2)
+   bit 7 indicates the external address is an offset
 */ 
 
 #define EXPRCAT_INTADDR       0x02
@@ -1663,6 +1668,7 @@ struct oprecord optable11[]=
 #define EXPRCAT_FIXED         0x10
 #define EXPRCAT_NEGATIVE      0x20
 #define EXPRCAT_ONEBYTE       0x40
+#define EXPRCAT_EXTOFF        0x80
 
 /*****************************************************************************/
 /* Symbol definitions                                                        */
@@ -2886,7 +2892,7 @@ texts[lp->value] = (char *)malloc(strlen(text) + 1);
 if (texts[lp->value])
   strcpy(texts[lp->value], text);
 
-if (!strcmp(namebuf, "FILCHR"))         /* special for FILCHR : set internal */
+if (!strcmp(namebuf, "&FILCHR"))        /* special for FILCHR : set internal */
   {                                     /* byte                              */
   switch (text[0])
     {
@@ -3791,8 +3797,16 @@ else
       if (toupper(*srcptr) == 'R')
         srcptr++;
       } 
-    }    
+    }
   mode++;
+  if (!absmode && !certain)
+    {
+    /* This may not be enough. */
+    if (mode == ADRMODE_PCR &&
+        exprcat == EXPRCAT_INTADDR &&
+        !unknown)
+      certain = 1;
+    }
   postbyte += 0x8c;
   if (opsize == 1)
     opsize = 2;    
@@ -4365,6 +4379,8 @@ for (i = 0; i < relcounter; i++)        /* write out the external data       */
   fputc((unsigned char)(reltable[i].addr & 0xFF), objfile);
 
   flags = 0x00;                         /* reset flags                       */
+  if (reltable[i].exprcat & EXPRCAT_EXTOFF)
+    flags |= 0x10;                      /* add offset flag if necessary      */
   if (reltable[i].exprcat & EXPRCAT_NEGATIVE)
     flags |= 0x20;                      /* add subtraction flag if necessary */
   if (reltable[i].exprcat & EXPRCAT_ONEBYTE)
@@ -5199,6 +5215,7 @@ switch (mode)
         offs--;
         opsize = 3;
         postbyte++;
+        p->addr++;
         }
       if (!unknown)
         {
@@ -5226,7 +5243,9 @@ switch (mode)
     if (opsize == 3)
       {
       putword((unsigned short)offs); 
-      addrelocation = 1;
+      if (mode == ADRMODE_PIN ||
+          p->exprcat & EXPRCAT_EXTADDR)
+        addrelocation = 1;
       }
     else
       putbyte((unsigned char)offs);   
@@ -5352,10 +5371,19 @@ if (mode != ADRMODE_DIR && mode != ADRMODE_EXT)
 putbyte((unsigned char)co);
 
 nDiff = operand - (loccounter + phase) - 3;
-putword((unsigned short)nDiff);
-if (((nDiff & 0xff80) == 0x0000) ||
-    ((nDiff & 0xff80) == 0xff80))
-  warning |= (certain) ? WRN_OPT : 0;
+
+if (p.exprcat & EXPRCAT_EXTADDR)
+  {
+  p.exprcat |= EXPRCAT_EXTOFF;
+  doaddress(&p);
+  }
+else
+  {
+  putword((unsigned short)nDiff);
+  if (((nDiff & 0xff80) == 0x0000) ||
+      ((nDiff & 0xff80) == 0xff80))
+    warning |= (certain) ? WRN_OPT : 0;
+  }
 }
 
 /*****************************************************************************/
@@ -5372,10 +5400,19 @@ if (mode != ADRMODE_DIR && mode != ADRMODE_EXT)
   error |= ERR_ILLEGAL_ADDR;
 putword((unsigned short)co);
 nDiff = operand - (loccounter + phase) - 4;
-putword((unsigned short)nDiff);
-if (((nDiff & 0xff80) == 0x0000) ||
-    ((nDiff & 0xff80) == 0xff80))
-  warning |= (certain) ? WRN_OPT : 0;
+
+if (p.exprcat & EXPRCAT_EXTADDR)
+  {
+  p.exprcat |= EXPRCAT_EXTOFF;
+  doaddress(&p);
+  }
+else
+  {
+  putword((unsigned short)nDiff);
+  if (((nDiff & 0xff80) == 0x0000) ||
+      ((nDiff & 0xff80) == 0xff80))
+    warning |= (certain) ? WRN_OPT : 0;
+  }
 }
 
 /*****************************************************************************/
@@ -5655,6 +5692,11 @@ switch (mode)
     putbyte((unsigned char)(co + 0x60));
     break;
   }
+
+if (p.exprcat & EXPRCAT_EXTADDR &&
+    mode == ADRMODE_PCR)
+  p.exprcat |= EXPRCAT_EXTOFF;
+
 doaddress(&p);
 }
 
