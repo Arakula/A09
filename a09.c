@@ -348,8 +348,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.59"
-#define VERSNUM      "$013B"            /* can be queried as &VERSION        */
+#define VERSION      "1.60"
+#define VERSNUM      "$013C"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
