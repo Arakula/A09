@@ -1,7 +1,7 @@
 /* A09, 6809 Assembler. 
    
    (C) Copyright 1993,1994 L.C. Benschop. 
-   Parts (C) Copyright 2001-2022 H. Seib.
+   Parts (C) Copyright 2001-2023 H. Seib.
    This version of the program is distributed under the terms and conditions 
    of the GNU General Public License version 2. See file the COPYING for details.   
    THERE IS NO WARRANTY ON THIS PROGRAM. 
@@ -318,6 +318,10 @@
    v1.60 2023-07-04 previous version ruined the FILCHR option; corrected. See
                          https://github.com/Arakula/A09/issues/13
                        for details.
+   v1.61 2023-11-30 PSH reg / PUL reg added for the 6800/6801/HC11 assemblers; see
+                         https://github.com/Arakula/A09/issues/18
+                       for details.
+
 */
 
 /* @see https://stackoverflow.com/questions/2989810/which-cross-platform-preprocessor-defines-win32-or-win32-or-win32
@@ -348,8 +352,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.60"
-#define VERSNUM      "$013C"            /* can be queried as &VERSION        */
+#define VERSION      "1.61"
+#define VERSNUM      "$013D"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -436,13 +440,13 @@ struct oprecord
 #define OPCAT_SETMASK        0x0019     /* set/clear with mask, 68HC11 BCLR  */
 #define OPCAT_BRMASK         0x001a     /* branch with mask, 68HC11   BRCLR  */
 #define OPCAT_OACCARITH      0x001b     /* acc. instr. w.optional acc   LDA  */
+#define OPCAT_OSTACK         0x001c     /* 6800 stack instr        PSHx,PULx */
 #define OPCAT_PSEUDO         0x003f     /* pseudo-ops                        */
 #define OPCAT_6309           0x0040     /* valid for 6309 only!              */
 #define OPCAT_NOIMM          0x0080     /* immediate not allowed!       STD  */
 #define OPCAT_6301           0x0100     /* valid for 6301 only!              */
 #define OPCAT_PAGE18         0x0200     /* operation with prefix 18 (68HC11) */
 #define OPCAT_PAGE1A         0x0400     /* operation with prefix 1A (68HC11) */
-
                                         /* the various Pseudo-Ops            */
 #define PSEUDO_RMB            0
 #define PSEUDO_ELSE           1
@@ -1111,13 +1115,15 @@ struct oprecord optable00[]=
   { "PAGE",    OPCAT_PSEUDO,      PSEUDO_PAG },
   { "PEMT",    OPCAT_PSEUDO,      PSEUDO_PEMT },
   { "PHASE",   OPCAT_PSEUDO,      PSEUDO_PHASE },
+  { "PSH",     OPCAT_OSTACK,      0x36 },
   { "PSHA",    OPCAT_ONEBYTE,     0x36 },
   { "PSHB",    OPCAT_ONEBYTE,     0x37 },
   { "PUB",     OPCAT_PSEUDO,      PSEUDO_PUB },
   { "PUBLIC",  OPCAT_PSEUDO,      PSEUDO_PUB },
+  { "PUL",     OPCAT_OSTACK,      0x30 },
   { "PULA",    OPCAT_ONEBYTE,     0x32 },
   { "PULB",    OPCAT_ONEBYTE,     0x33 },
-  { "REG",     OPCAT_PSEUDO,      PSEUDO_REG },
+//{ "REG",     OPCAT_PSEUDO,      PSEUDO_REG },    // not needed
   { "REP",     OPCAT_PSEUDO,      PSEUDO_REP },
   { "REPEAT",  OPCAT_PSEUDO,      PSEUDO_REP },
   { "RMB",     OPCAT_PSEUDO,      PSEUDO_RMB },
@@ -1331,15 +1337,17 @@ struct oprecord optable01[]=
   { "PAGE",    OPCAT_PSEUDO,      PSEUDO_PAG },
   { "PEMT",    OPCAT_PSEUDO,      PSEUDO_PEMT },
   { "PHASE",   OPCAT_PSEUDO,      PSEUDO_PHASE },
+  { "PSH",     OPCAT_OSTACK,      0x34 },
   { "PSHA",    OPCAT_ONEBYTE,     0x36 },
   { "PSHB",    OPCAT_ONEBYTE,     0x37 },
   { "PSHX",    OPCAT_ONEBYTE,     0x3c },
   { "PUB",     OPCAT_PSEUDO,      PSEUDO_PUB },
   { "PUBLIC",  OPCAT_PSEUDO,      PSEUDO_PUB },
+  { "PUL",     OPCAT_OSTACK,      0x30 },
   { "PULA",    OPCAT_ONEBYTE,     0x32 },
   { "PULB",    OPCAT_ONEBYTE,     0x33 },
   { "PULX",    OPCAT_ONEBYTE,     0x38 },
-  { "REG",     OPCAT_PSEUDO,      PSEUDO_REG },
+//{ "REG",     OPCAT_PSEUDO,      PSEUDO_REG },    // not needed
   { "REP",     OPCAT_PSEUDO,      PSEUDO_REP },
   { "REPEAT",  OPCAT_PSEUDO,      PSEUDO_REP },
   { "RMB",     OPCAT_PSEUDO,      PSEUDO_RMB },
@@ -1572,17 +1580,19 @@ struct oprecord optable11[]=
   { "PAGE",    OPCAT_PSEUDO,      PSEUDO_PAG },
   { "PEMT",    OPCAT_PSEUDO,      PSEUDO_PEMT },
   { "PHASE",   OPCAT_PSEUDO,      PSEUDO_PHASE },
+  { "PSH",     OPCAT_OSTACK,      0x34 },
   { "PSHA",    OPCAT_ONEBYTE,     0x36 },
   { "PSHB",    OPCAT_ONEBYTE,     0x37 },
   { "PSHX",    OPCAT_ONEBYTE,     0x3c },
   { "PSHY",    OPCAT_TWOBYTE,     0x183c },
   { "PUB",     OPCAT_PSEUDO,      PSEUDO_PUB },
   { "PUBLIC",  OPCAT_PSEUDO,      PSEUDO_PUB },
+  { "PUL",     OPCAT_OSTACK,      0x30 },
   { "PULA",    OPCAT_ONEBYTE,     0x32 },
   { "PULB",    OPCAT_ONEBYTE,     0x33 },
   { "PULX",    OPCAT_ONEBYTE,     0x38 },
   { "PULY",    OPCAT_TWOBYTE,     0x1838 },
-  { "REG",     OPCAT_PSEUDO,      PSEUDO_REG },
+//{ "REG",     OPCAT_PSEUDO,      PSEUDO_REG },    // not needed
   { "REP",     OPCAT_PSEUDO,      PSEUDO_REP },
   { "REPEAT",  OPCAT_PSEUDO,      PSEUDO_REP },
   { "RMB",     OPCAT_PSEUDO,      PSEUDO_RMB },
@@ -1774,26 +1784,38 @@ struct regrecord regtable63[]=          /* same for HD6309                   */
 
 struct regrecord regtable00[]=
   {
-  { "X",   0x01, 0x10 },
-  { "S",   0x04, 0x40 },
-  { "PC",  0x05, 0x80 },
+  { "X",   0x01, 0x00 },
+  { "S",   0x04, 0x00 },
+  { "PC",  0x05, 0x00 },
   { "A",   0x08, 0x02 },
-  { "B",   0x09, 0x04 },
-  { "CC",  0x0a, 0x01 },
-  { "CCR", 0x0a, 0x01 },
+  { "B",   0x09, 0x03 },
+  { "CC",  0x0a, 0x00 },
+  { "CCR", 0x0a, 0x00 },
+  { 0,     0,    0    }
+  };
+
+struct regrecord regtable01[]=
+  {
+  { "X",   0x01, 0x08 },
+  { "S",   0x04, 0x00 },
+  { "PC",  0x05, 0x00 },
+  { "A",   0x08, 0x02 },
+  { "B",   0x09, 0x03 },
+  { "CC",  0x0a, 0x00 },
+  { "CCR", 0x0a, 0x00 },
   { 0,     0,    0    }
   };
 
 struct regrecord regtable11[]=
   {
-  { "X",   0x01, 0x10 },
-  { "Y",   0x02, 0x20 },
-  { "S",   0x04, 0x40 },
-  { "PC",  0x05, 0x80 },
+  { "X",   0x01, 0x08 },
+  { "Y",   0x02, 0x88 },
+  { "S",   0x04, 0x00 },
+  { "PC",  0x05, 0x00 },
   { "A",   0x08, 0x02 },
-  { "B",   0x09, 0x04 },
-  { "CC",  0x0a, 0x01 },
-  { "CCR", 0x0a, 0x01 },
+  { "B",   0x09, 0x03 },
+  { "CC",  0x0a, 0x00 },
+  { "CCR", 0x0a, 0x00 },
   { 0,     0,    0    }
   };
 
@@ -5785,37 +5807,57 @@ putbyte(postbyte);
 /* pshpul : operates on PSH / PUL mnemonics                                  */
 /*****************************************************************************/
 
-void pshpul(int co)
+void pshpul(int co, int mode)
 {
 struct regrecord *p;
 struct relocrecord sp = {0};
-
-putbyte((unsigned char)co);
 postbyte = 0;
 
 skipspace();
-if (*srcptr == '#')
+
+if (mode == 1)                          /* 6800/6801/6811 mode:              */
   {
-  srcptr++;
-  if (!(dwOptions & OPTION_TSC))
-    skipspace();
-  postbyte = (unsigned char)scanexpr(0, &sp);
-  }
-else do
-  {
-  if (*srcptr == ',')
-    srcptr++;
-  if (!(dwOptions & OPTION_TSC))
-    skipspace();
   scanname(); 
   if ((p = findreg(unamebuf)) == 0)
     error |= ERR_ILLEGAL_ADDR;
   else
-    postbyte |= p->psh; 
-  if (!(dwOptions & OPTION_TSC))
-    skipspace();
-  } while (*srcptr == ',');
-putbyte(postbyte);
+    {
+    postbyte |= p->psh;
+    if (!postbyte)
+      error |= ERR_ILLEGAL_ADDR;
+    }
+  co |= postbyte & 0x7f;
+  if (postbyte & 0x80)
+    putbyte((unsigned char)0x18);
+  }
+
+putbyte((unsigned char)co);
+
+if (mode == 0)                          /* 6809/6309 mode:                   */
+  {
+  if (*srcptr == '#')
+    {
+    srcptr++;
+    if (!(dwOptions & OPTION_TSC))
+      skipspace();
+    postbyte = (unsigned char)scanexpr(0, &sp);
+    }
+  else do
+    {
+    if (*srcptr == ',')
+      srcptr++;
+    if (!(dwOptions & OPTION_TSC))
+      skipspace();
+    scanname(); 
+    if ((p = findreg(unamebuf)) == 0)
+      error |= ERR_ILLEGAL_ADDR;
+    else
+      postbyte |= p->psh; 
+    if (!(dwOptions & OPTION_TSC))
+      skipspace();
+    } while (*srcptr == ',');
+  putbyte(postbyte);
+  }
 }
 
 /*****************************************************************************/
@@ -6419,7 +6461,7 @@ for (i = 0; i < (sizeof(Options) / sizeof(Options[0])); i++)
       case OPTION_M01 :                 /* switch to MC6801 processor        */
         optable = optable01;
         optablesize = sizeof(optable01) / sizeof(optable01[0]);
-        regtable = regtable00;
+        regtable = regtable01;
         bitregtable = bitregtable00;
         bitregtablesize = sizeof(bitregtable00) / sizeof(bitregtable00[0]);
         scanoperands = scanoperands00;
@@ -6427,7 +6469,7 @@ for (i = 0; i < (sizeof(Options) / sizeof(Options[0])); i++)
       case OPTION_H01 :                 /* switch to HD6301 processor        */
         optable = optable01;
         optablesize = sizeof(optable01) / sizeof(optable01[0]);
-        regtable = regtable00;
+        regtable = regtable01;
         bitregtable = bitregtable00;
         bitregtablesize = sizeof(bitregtable00) / sizeof(bitregtable00[0]);
         scanoperands = scanoperands00;
@@ -7929,7 +7971,7 @@ if (isValidNameChar(*srcptr, 1))        /* mnemonic or macro name            */
           tfrexg(co);
           break;
         case OPCAT_STACK :
-          pshpul(co);
+          pshpul(co, 0);
           break;
         case OPCAT_BITDIRECT :          /* 6301/6309 only                    */
           bitdirect(co);
@@ -7954,6 +7996,9 @@ if (isValidNameChar(*srcptr, 1))        /* mnemonic or macro name            */
           break;
         case OPCAT_BRMASK :             /* 68HC11 only                       */
           brmask(co);
+          break;
+        case OPCAT_OSTACK :
+          pshpul(co, 1);
           break;
         case OPCAT_PSEUDO :
           pseudoop(co, lp);
