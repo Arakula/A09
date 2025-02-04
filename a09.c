@@ -105,7 +105,7 @@
         | M02|M03|M08 MC6802 / MC6803 / MC6808 mode
         | M09         MC6809 mode
     TXT | NTX*        Print text table
-    LPA | LNP*        Listing in f9dasm patch format
+    LPA | LNP*        Listing in f9dasm/dasmfw patch format
     DLM | NDL*        Define label on macro expansion
     RED | NRD*        
     FBG*| NFB         Fill gaps in binary output files
@@ -321,7 +321,7 @@
    v1.61 2023-11-30 PSH reg / PUL reg added for the 6800/6801/HC11 assemblers; see
                          https://github.com/Arakula/A09/issues/18
                        for details.
-
+   v1.62 2025-01-30 improved line level cleanup and flag handling
 */
 
 /* @see https://stackoverflow.com/questions/2989810/which-cross-platform-preprocessor-defines-win32-or-win32-or-win32
@@ -352,8 +352,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.61"
-#define VERSNUM      "$013D"            /* can be queried as &VERSION        */
+#define VERSION      "1.62"
+#define VERSNUM      "$013E"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -378,24 +378,28 @@ struct linebuf
   long ln;                              /* line number therein               */
   unsigned char lvl;                    /* line level                        */
   unsigned char rel;                    /* relocation mode                   */
+  unsigned char flg;                    /* flags                             */
   char txt[1];                          /* text buffer                       */
   };
 
 char *fnms[MAXFILES] = {0};             /* process up to N different files   */
 short nfnms;                            /* # loaded files                    */
 
-                                        /* special bits in lvl :             */
+                                        /* flag definitions :                */
+#define LINCAT_PEMTCMT      0x10        /* prepend comment char in listing   */
 #define LINCAT_MACDEF       0x20        /* macro definition                  */
 #define LINCAT_MACEXP       0x40        /* macro expansion                   */
 #define LINCAT_MACINV       (0x20|0x40) /* macro invocation                  */
 #define LINCAT_INVISIBLE    0x80        /* does not appear in listing        */
+
 #define LINCAT_LVLMASK      0x1F        /* mask for line levels (0..31)      */
 
                                         /* Helpers for the above             */
-#define LINE_IS_MACDEF(lvl) ((lvl & LINCAT_MACINV) == LINCAT_MACDEF)
-#define LINE_IS_MACEXP(lvl) ((lvl & LINCAT_MACINV) == LINCAT_MACEXP)
-#define LINE_IS_MACINV(lvl) ((lvl & LINCAT_MACINV) == LINCAT_MACINV)
-#define LINE_IS_INVISIBLE(lvl) (lvl & LINCAT_INVISIBLE)
+#define LINE_IS_PEMTCMT(flg) ((flg & LINCAT_PEMTCMT) == LINCAT_PEMTCMT)
+#define LINE_IS_MACDEF(flg) ((flg & LINCAT_MACINV) == LINCAT_MACDEF)
+#define LINE_IS_MACEXP(flg) ((flg & LINCAT_MACINV) == LINCAT_MACEXP)
+#define LINE_IS_MACINV(flg) ((flg & LINCAT_MACINV) == LINCAT_MACINV)
+#define LINE_IS_INVISIBLE(flg) (flg & LINCAT_INVISIBLE)
 
 struct linebuf *rootline = NULL;        /* pointer to 1st line of the file   */
 struct linebuf *curline = NULL;         /* pointer to currently processed ln */
@@ -2226,6 +2230,7 @@ if (prev)
 if (pNew->next)
   pNew->next->prev = pNew;
 pNew->lvl = lvl;
+pNew->flg = 0;
 pNew->fn = fn;
 pNew->ln = line;
 pNew->rel = ' ';
@@ -2288,7 +2293,7 @@ nCurCol = 0;                            /* and reset current column          */
 /* putlist : puts something to the list file                                 */
 /*****************************************************************************/
 
-void putlist(char *szFmt, ...)
+void putlist(const char *szFmt, ...)
 {
 char szList[1024];                      /* buffer for 1k list output         */
 char *p;
@@ -4839,19 +4844,19 @@ void outlist(struct oprecord *op, struct symrecord *lpLabel)
 {
 int i;
 
-if (LINE_IS_INVISIBLE(curline->lvl) &&  /* don't list invisible lines        */
+if (LINE_IS_INVISIBLE(curline->flg) &&  /* don't list invisible lines        */
     !(dwOptions & OPTION_INV))
   return;
 
-if (LINE_IS_MACINV(curline->lvl) &&     /* don't list macro invocations if   */
+if (LINE_IS_MACINV(curline->flg) &&     /* don't list macro invocations if   */
     !(dwOptions & OPTION_MAC))          /* not explicitly requested          */
   return;
 
-if (LINE_IS_MACEXP(curline->lvl) &&     /* don't list macro expansions if    */
+if (LINE_IS_MACEXP(curline->flg) &&     /* don't list macro expansions if    */
     !(dwOptions & OPTION_EXP))          /* not explicitly requested          */
   return;
 
-if ((curline->lvl & LINCAT_LVLMASK) &&  /* if level 1..31                    */
+if ((curline->lvl & LINCAT_LVLMASK) &&  /* if level 1..nn                    */
     !(dwOptions & OPTION_LLL))          /* and this is not to be listed      */
   return;
 
@@ -4871,6 +4876,12 @@ if (!absmode &&                         /* if in relocating assembler mode   */
 
 if (dwOptions & OPTION_LPA)             /* if in patch mode                  */
   {
+  const char *blnkfil = "      ";
+  if (LINE_IS_PEMTCMT(curline->flg))    /* if PEMT comment flag set          */
+    {
+    putlist("*");                       /* prefix line with *                */
+    blnkfil++;
+    }
   if ((op) && (op->cat == OPCAT_PSEUDO))
     {
     switch (op->code)
@@ -4920,7 +4931,7 @@ if (dwOptions & OPTION_LPA)             /* if in patch mode                  */
     putlist("patch ");                  /* write "patch"                     */
     }
   else if (*curline->txt)
-    putlist("      ");
+    putlist(blnkfil);
 #if 0
   else
     putlist("comment %04X", oldlc);
@@ -4930,13 +4941,15 @@ else if ((warning & WRN_OPT) &&         /* excessive branch, TSC style       */
     (dwOptions & OPTION_TSC) &&         
     (dwOptions & OPTION_WAR))
   putlist(">");
-else if (LINE_IS_MACDEF(curline->lvl))  /* if in macro definition            */
+else if (LINE_IS_MACDEF(curline->flg))  /* if in macro definition            */
   putlist("#");                         /* prefix line with #                */
-else if (LINE_IS_MACEXP(curline->lvl))  /* if in macro expansion             */
+else if (LINE_IS_MACEXP(curline->flg))  /* if in macro expansion             */
   putlist("+");                         /* prefix line with +                */
-else if (LINE_IS_MACINV(curline->lvl))  /* if in macro invocation            */
+else if (LINE_IS_MACINV(curline->flg))  /* if in macro invocation            */
   putlist("&");                         /* prefix line with &                */
-else if (LINE_IS_INVISIBLE(curline->lvl))
+else if (LINE_IS_INVISIBLE(curline->flg))
+  putlist("-");
+else if (LINE_IS_PEMTCMT(curline->flg))
   putlist("-");
 else if (*curline->txt)                 /* otherwise                         */
   putlist(" ");                         /* prefix line with blank            */
@@ -6618,6 +6631,8 @@ switch (co)
     break;  
   case PSEUDO_EQU :                     /* label EQU x                       */
     nRepNext = 0;                       /* reset eventual repeat             */
+    if (dwOptions & OPTION_LPA)         /* if listing in patch format,       */
+      curline->flg |= LINCAT_PEMTCMT;   /* prefix with comment               */
     operand = scanexpr(0, &p);
     if (!lp)
       error |= ERR_LABEL_MISSING;
@@ -7012,7 +7027,7 @@ switch (co)
   case PSEUDO_END :                     /* END [loadaddr]                    */
     nRepNext = 0;                       /* reset possible repeat             */
     skipspace();                        /* skip blanks                       */
-    if ((curline->lvl & 0x0f) == 0)     /* only in outermost level!          */
+    if (!(curline->lvl & LINCAT_LVLMASK))  /* only in outermost level!       */
       {
       if (isfactorstart(*srcptr))       /* if possible transfer address      */
         {
@@ -7028,20 +7043,20 @@ switch (co)
         }
       }
                                         /* terminate current level           */
-    g_termflg = (curline->lvl & 0x0f);  /* (and any sublevels)               */
+    g_termflg = (curline->lvl & LINCAT_LVLMASK);  /* (and any sublevels)     */
     break;     
   case PSEUDO_INCLUDE :                 /* INCLUDE <filename>                */
     nRepNext = 0;                       /* reset eventual repeat             */
     if (inMacro ||                      /* if in macro definition            */
-        (curline->lvl & LINCAT_MACEXP)) /* or macro expansion                */
+        (curline->flg & LINCAT_MACEXP)) /* or macro expansion                */
       error |= ERR_EXPR;                /* this is an error.                 */
     else if (pass == 1)                 /* otherwise expand if in pass 1     */
       {
       char fname[FNLEN + 1];
       int instring = 0;
       char *osrc = srcptr;
-
-      if ((curline->lvl & 0x0f) == 0x0f)/* if impossible                     */
+                                        /* if impossible                     */
+      if ((curline->lvl & LINCAT_LVLMASK) == LINCAT_LVLMASK)
         {
 #if 0
         allocline(curline, "NULL", -1, 0x0f,
@@ -7066,10 +7081,10 @@ switch (co)
         fname[i] = *srcptr++;
         }
       fname[i] = 0;
-      curline->lvl |= LINCAT_INVISIBLE; /* preclude listing of INCLUDE line  */
+      curline->flg |= LINCAT_INVISIBLE; /* preclude listing of INCLUDE line  */
                                         
       readfile(fname,                   /* append include after current line */
-               (unsigned char)((curline->lvl & 0x0f) + 1),
+               (unsigned char)((curline->lvl & LINCAT_LVLMASK) + 1),
                curline);
       expandtext();                     /* re-expand current line            */
       srcptr = osrc;
@@ -7124,7 +7139,7 @@ switch (co)
       else
         break;
       }
-    curline->lvl |= LINCAT_INVISIBLE;
+    curline->flg |= LINCAT_INVISIBLE;
     if ((listing & LIST_ON) && listfile &&
         (dwOptions & OPTION_PAG) &&
         (!(curline->lvl & LINCAT_LVLMASK) || (dwOptions & OPTION_LLL)) &&
@@ -7151,7 +7166,7 @@ switch (co)
       if (error)
         break;
       }
-    curline->lvl |= LINCAT_INVISIBLE;
+    curline->flg |= LINCAT_INVISIBLE;
     if (listing & LIST_ON)
       {
       if (nSpc > 0)                     /* if spaces needed                  */
@@ -7173,7 +7188,7 @@ switch (co)
     if (!(dwOptions & OPTION_TSC))
       skipspace();
     nRepNext = scanexpr(0, &p);         /* get # repetitions                 */
-    curline->lvl |= LINCAT_INVISIBLE;
+    curline->flg |= LINCAT_INVISIBLE;
     break;
   case PSEUDO_SETPG :                   /* SETPG pagelen                     */
     if (!(dwOptions & OPTION_TSC))
@@ -7183,7 +7198,7 @@ switch (co)
       nLinesPerPage = 10;
     else if (nLinesPerPage > 1000)
       nLinesPerPage = 1000;
-    curline->lvl |= LINCAT_INVISIBLE;
+    curline->flg |= LINCAT_INVISIBLE;
     break;
   case PSEUDO_SETLI :                   /* SETLI linelen                     */
     if (!(dwOptions & OPTION_TSC))
@@ -7193,7 +7208,7 @@ switch (co)
       nColsPerLine = 40;
     else if (nColsPerLine > 2000)
       nColsPerLine = 2000;
-    curline->lvl |= LINCAT_INVISIBLE;
+    curline->flg |= LINCAT_INVISIBLE;
     break;
   case PSEUDO_SYMLEN :                  /* SYMLEN symbollength               */
     if (!(dwOptions & OPTION_TSC))
@@ -7206,7 +7221,7 @@ switch (co)
       maxidlen = 8;
     else if (maxidlen > MAXIDLEN)
       maxidlen = MAXIDLEN;
-    curline->lvl |= LINCAT_INVISIBLE;
+    curline->flg |= LINCAT_INVISIBLE;
     break;
   case PSEUDO_MACRO :                   /* label MACRO                       */
     if (!lp)                            /* a macro NEEDS a label!            */
@@ -7226,7 +7241,7 @@ switch (co)
              macros[lp->value] != curline)
       error |= ERR_LABEL_MULT;
     inMacro++;
-    curline->lvl |= LINCAT_MACDEF;
+    curline->flg |= LINCAT_MACDEF;
     if (inMacro > 1)
       error |= ERR_NESTING;
     break;
@@ -7237,7 +7252,7 @@ switch (co)
       {
       if (lvlMacro)
         lvlMacro--;
-      if (!(curline->lvl & LINCAT_MACEXP))
+      if (!(curline->flg & LINCAT_MACEXP))
         error |= ERR_EXPR;
       }
     break;
@@ -7248,7 +7263,7 @@ switch (co)
       {
       if (lvlMacro)
         lvlMacro--;
-      if (!(curline->lvl & LINCAT_MACEXP))
+      if (!(curline->flg & LINCAT_MACEXP))
         error |= ERR_EXPR;
       }
     break;
@@ -7352,10 +7367,10 @@ switch (co)
         fname[i] = *srcptr++;
         }
       fname[i] = 0;
-      curline->lvl |= LINCAT_INVISIBLE; /* preclude listing of BINARY line   */
+      curline->flg |= LINCAT_INVISIBLE; /* preclude listing of BINARY line   */
                                         
       readbinary(fname,                 /* append binary after current line  */
-               (unsigned char)((curline->lvl & 0x0f) + 1),
+               (unsigned char)((curline->lvl & LINCAT_LVLMASK) + 1),
                curline, lp);
       expandtext();                     /* re-expand current line            */
       srcptr = osrc;
@@ -7400,7 +7415,7 @@ switch (co)
       while (*srcptr)                   /* skip rest if too long             */
         srcptr++;
       if (!(dwOptions & OPTION_LPA))
-        curline->lvl |= LINCAT_INVISIBLE;
+        curline->flg |= LINCAT_INVISIBLE;
       }
     break;
   }
@@ -7817,7 +7832,7 @@ condline = 0;
 printovr = 0;
 
 if (inMacro)
-  curline->lvl |= LINCAT_MACDEF;
+  curline->flg |= LINCAT_MACDEF;
 
 if (isValidNameChar(*srcptr, 1))        /* look for label on line start      */
   {
@@ -7855,10 +7870,10 @@ if (isValidNameChar(*srcptr, 1))        /* mnemonic or macro name            */
   if (lpmac && lpmac->cat == SYMCAT_MACRO)
     {
     if (pass == 1 &&                    /* if in pass 1 and not in macro def */
-        !LINE_IS_MACDEF(curline->lvl))
+        !LINE_IS_MACDEF(curline->flg))
       {                                 /* if on top level,                  */
-      if (!LINE_IS_MACEXP(curline->lvl))
-        curline->lvl |= LINCAT_MACINV;  /* mark as macro invocation          */
+      if (!LINE_IS_MACEXP(curline->flg))
+        curline->flg |= LINCAT_MACINV;  /* mark as macro invocation          */
       if (dwOptions & OPTION_DLM)
         setlabel(lp);
       if (++lvlMacro <= LINCAT_LVLMASK)
@@ -8052,9 +8067,9 @@ else if ((listing & LIST_ON) &&
          (dwOptions & OPTION_LIS) &&
          (dwOptions & OPTION_LP1))
   {
-  if (curline->lvl & LINCAT_MACEXP ||   /* prevent 2nd listing of macro      */
+  if (curline->flg & LINCAT_MACEXP ||   /* prevent 2nd listing of macro      */
       !curline->next ||                 /* since this is done in expansion   */
-      !(curline->next->lvl & LINCAT_MACEXP))
+      !(curline->next->flg & LINCAT_MACEXP))
     outlist(op, lpLabel);
   }
 
@@ -8312,7 +8327,7 @@ struct linebuf *plast = pline;
 while (pline)
   {
   if (g_termflg < 0 ||                  /* skip all lines until going up     */
-      (pline->lvl & 0x0f) < g_termflg)
+      (pline->lvl & LINCAT_LVLMASK) < g_termflg)
     {
     curline = pline;
     error = ERR_OK;
