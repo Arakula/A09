@@ -322,6 +322,17 @@
                          https://github.com/Arakula/A09/issues/18
                        for details.
    v1.62 2025-01-30 improved line level cleanup and flag handling
+   v1.63 2026-09-02 Yet another regression version ...
+                    Macro expansion error cured; see
+                         https://github.com/Arakula/A09/issues/22
+                    for details.
+                    Empty macro names don't cause segfaults any more; see
+                         https://github.com/Arakula/A09/issues/23
+                    for details.
+                    FILL/RMB did not work correctly at the start of a module;
+                    corrected. See
+                         https://github.com/Arakula/A09/issues/24
+                    for (impressively exhaustive) details.
 */
 
 /* @see https://stackoverflow.com/questions/2989810/which-cross-platform-preprocessor-defines-win32-or-win32-or-win32
@@ -352,8 +363,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.62"
-#define VERSNUM      "$013E"            /* can be queried as &VERSION        */
+#define VERSION      "1.63"
+#define VERSNUM      "$013F"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -6596,7 +6607,7 @@ switch (co)
 
     printovr |= PRINTOV_PADDR;          /* print address in listing          */
     setlabel(lp);
-    if (generating && pass == 2)
+    if (pass == 2)
       {
       if (co != PSEUDO_RMB ||
           outmode == OUT_BIN ||
@@ -7226,7 +7237,7 @@ switch (co)
   case PSEUDO_MACRO :                   /* label MACRO                       */
     if (!lp)                            /* a macro NEEDS a label!            */
       error |= ERR_LABEL_MISSING;
-    if (lp->cat == SYMCAT_EMPTY)
+    else if (lp->cat == SYMCAT_EMPTY)
       {
       if (nMacros < MAXMACROS)          /* if space for another macro defin. */
         {
@@ -7629,6 +7640,7 @@ while (pmac)                            /* walk through the macro lines      */
     switch (op->code)                   /* examine for macro expansion       */
       {
       case PSEUDO_ENDM :                /* ENDM ?                            */
+        skipit = 1;
         terminate = 1;                  /* terminate macro expansion         */
         break;
       case PSEUDO_EXITM :               /* EXITM ?                           */
