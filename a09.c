@@ -6625,6 +6625,11 @@ switch (co)
           for (i = 0; i < fillcnt && i < sizeof(codebuf); i++)
             putbyte(fillc);
           }
+        else
+          {
+          loccounter += (unsigned short)operand;
+          hexaddr = loccounter;
+          }
         }
       else
         {
