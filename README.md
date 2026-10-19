@@ -1,12 +1,13 @@
 # A09 - 6800/6801/6809/6301/6309/68HC11 Assembler
 
 Copyright (c) 1993,1994 L.C. Benschop  
-Parts Copyright (c) 2001-2022 Hermann Seib
+Parts Copyright (c) 2001-2026 Hermann Seib
 
 
 Based on Lennart Benschop's C core that can be found somewhere on the 'net 
-(last address known to me was
-[http://koti.mbnet.fi/~atjs/mc6809/Assembler/A09.c](http://koti.mbnet.fi/~atjs/mc6809/Assembler/A09.c)),
+(last known address: 
+[https://atjs.great-site.net/mc6809/Assembler/A09.c](https://atjs.great-site.net/mc6809/Assembler/A09.c) ...
+God I hate chasing down elusive old source files that just can't stay put),
 I built a complete Macro Assembler that is functionally better than the 
 TSC Flex9 Assembler (no wonder, I got multimegabytes to play with, whereas this 
 excellent piece of software works within 50K or so!). It can deliver binary, 
@@ -20,7 +21,7 @@ the Source, Luke!" principle if you just want to hack a little 6809 assembly
 program, I've added this documentation. Have fun!
 
 
-Hermann Seib, 2022
+Hermann Seib, 2026
 
 ## Syntax
 

@@ -1,7 +1,7 @@
 /* A09, 6809 Assembler. 
    
    (C) Copyright 1993,1994 L.C. Benschop. 
-   Parts (C) Copyright 2001-2023 H. Seib.
+   Parts (C) Copyright 2001-2026 H. Seib.
    This version of the program is distributed under the terms and conditions 
    of the GNU General Public License version 2. See file the COPYING for details.   
    THERE IS NO WARRANTY ON THIS PROGRAM. 
@@ -333,6 +333,10 @@
                     corrected. See
                          https://github.com/Arakula/A09/issues/24
                     for (impressively exhaustive) details.
+   v1.64 2026-10-19 Yet another regression version ...
+                    FILL/RMB did not work correctly. See
+                         https://github.com/Arakula/A09/issues/25
+                    for details.
 */
 
 /* @see https://stackoverflow.com/questions/2989810/which-cross-platform-preprocessor-defines-win32-or-win32-or-win32
@@ -363,8 +367,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.63"
-#define VERSNUM      "$013F"            /* can be queried as &VERSION        */
+#define VERSION      "1.64"
+#define VERSNUM      "$0140"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -2148,7 +2152,7 @@ unsigned char postbyte;
 
 long dpsetting = 0;                     /* Direct Page Default = 0           */
 
-unsigned char codebuf[256];
+unsigned char codebuf[65536];
 int codeptr;                            /* byte offset within instruction    */
 int suppress;                           /* 0=no suppress                     */
                                         /* 1=until ENDIF                     */
@@ -6613,32 +6617,38 @@ switch (co)
           outmode == OUT_BIN ||
           outmode == OUT_REL)
         {
+        unsigned short fillcnt = (unsigned short)operand;
         if (co != PSEUDO_RMB)           /* if filling with a value,          */
-          {                             /* fill codebuf first                */
+          {                             /* fill codebuf                      */
           if (!inMacro)
             generating = 1;
-          for (i = 0; i < operand && i < sizeof(codebuf); i++)
+          for (i = 0; i < fillcnt && i < sizeof(codebuf); i++)
             putbyte(fillc);
-          operand -= i;
           }
-        for (i = 0; i < operand; i++)   /* if too much, output rest directly */
-          outbyte(fillc, i);
         }
-      else switch (outmode)
+      else
         {
-        case OUT_SREC :                 /* Motorola S51-09 ?                 */
-          flushhex();
-          break;
-        case OUT_IHEX :                 /* Intel Hex ?                       */
-          flushihex();  
-          break;
-        case OUT_FLEX :                 /* FLEX binary ?                     */
-          flushflex();
-          break;
+        switch (outmode)
+          {
+          case OUT_SREC :               /* Motorola S51-09 ?                 */
+            flushhex();
+            break;
+          case OUT_IHEX :               /* Intel Hex ?                       */
+            flushihex();  
+            break;
+          case OUT_FLEX :               /* FLEX binary ?                     */
+            flushflex();
+            break;
+          }
+        loccounter += (unsigned short)operand;
+        hexaddr = loccounter;
         }
-      }   
-    loccounter += (unsigned short)operand;
-    hexaddr = loccounter;
+      }
+    else
+      {
+      loccounter += (unsigned short)operand;
+      hexaddr = loccounter;
+      }
     break;  
   case PSEUDO_EQU :                     /* label EQU x                       */
     nRepNext = 0;                       /* reset eventual repeat             */
