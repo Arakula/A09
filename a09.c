@@ -337,6 +337,8 @@
                     FILL/RMB did not work correctly. See
                          https://github.com/Arakula/A09/issues/25
                     for details.
+   v1.65 2026-10-20 RMB fills up space in binary output file if used inside
+                    a code-producing block.
 */
 
 /* @see https://stackoverflow.com/questions/2989810/which-cross-platform-preprocessor-defines-win32-or-win32-or-win32
@@ -367,8 +369,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.64"
-#define VERSNUM      "$0140"            /* can be queried as &VERSION        */
+#define VERSION      "1.65"
+#define VERSNUM      "$0141"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -6611,6 +6613,7 @@ switch (co)
 
     printovr |= PRINTOV_PADDR;          /* print address in listing          */
     setlabel(lp);
+
     if (pass == 2)
       {
       if (co != PSEUDO_RMB ||
@@ -6618,7 +6621,9 @@ switch (co)
           outmode == OUT_REL)
         {
         unsigned short fillcnt = (unsigned short)operand;
-        if (co != PSEUDO_RMB)           /* if filling with a value,          */
+        if (co != PSEUDO_RMB ||         /* if filling with a value,          */
+            (!inMacro && generating &&  /* or already generating code&data,  */
+             outmode == OUT_BIN))       /* but only for binaries             */
           {                             /* fill codebuf                      */
           if (!inMacro)
             generating = 1;
