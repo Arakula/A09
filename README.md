@@ -622,9 +622,8 @@ relocatable elements have to be parenthesized. As an example,
 (rel1-rel2)+ext1-(rel2-rel1)</pre>
  would work.
 
-The command line switch 
-that instructs RELASMB to treat all undefined labels as external labels isn't 
-implemented.
+The command line switch that instructs RELASMB to treat all undefined labels
+as external labels can be simulated by passing <b>-oUEX</b>.
 
 #### Fix Mode
 

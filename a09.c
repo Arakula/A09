@@ -339,6 +339,10 @@
                     for details.
    v1.65 2026-10-20 RMB fills up space in binary output file if used inside
                     a code-producing block.
+   v1.66 2026-10-21 Fill up Flex binaries with zeroes to next 252-byte boundary;
+                    see
+                         https://github.com/Arakula/A09/issues/20
+                    for details.
 */
 
 /* @see https://stackoverflow.com/questions/2989810/which-cross-platform-preprocessor-defines-win32-or-win32-or-win32
@@ -369,8 +373,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.65"
-#define VERSNUM      "$0141"            /* can be queried as &VERSION        */
+#define VERSION      "1.66"
+#define VERSNUM      "$0142"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -8613,6 +8617,9 @@ switch (outmode)                        /* look whether object cleanup needed*/
       fputc((tfradr >> 8) & 0xff, objfile);
       fputc(tfradr & 0xff, objfile);
       }
+                                        /* fill last sector with zeroes      */
+    for (i = (int)ftell(objfile); i % 252; i++)
+      fputc(0x00, objfile);
     break;
   case OUT_REL :                        /* FLEX Relocatable                  */
 

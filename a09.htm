@@ -7,12 +7,12 @@
 <h1>A09 - 6800/6801/6809/68HC11/6301/6309 Assembler</h1>
 
 <p align="right">Copyright (c) 1993,1994 L.C. Benschop<br>
-Parts Copyright (c) 2001-2020 Hermann Seib</p>
+Parts Copyright (c) 2001-2026 Hermann Seib</p>
 
 <p>Based on Lennart Benschop's C core that can be found somewhere on the 'net 
 (last address known to me was
-<a href="http://koti.mbnet.fi/~atjs/mc6809/Assembler/A09.c">
-http://koti.mbnet.fi/~atjs/mc6809/Assembler/A09.c</a>),
+<a href="https://atjs.great-site.net/mc6809/Assembler/A09.c">
+https://atjs.great-site.net/mc6809/Assembler/A09.c</a>),
 I built a complete Macro Assembler that is functionally better than the 
 TSC Flex9 Assembler (no wonder, I got multimegabytes to play with, whereas this 
 excellent piece of software works within 50K or so!). It can deliver binary, 
@@ -24,7 +24,7 @@ A09 has reached a level of complexity that doesn't really lend itself to followi
 the Source, Luke!&quot; principle if you just want to hack a little 6809 assembly 
 program, I've added this documentation. Have fun!</p>
 
-<p align="right">Hermann Seib, 2020</p>
+<p align="right">Hermann Seib, 2026</p>
 
 <h2>Syntax</h2>
 
@@ -627,9 +627,9 @@ label has to be either the last element in the expression or the paired
 relocatable elements have to be parenthesized. As an example,
 <pre>rel1-rel2+ext1-rel2+rel1</pre> would be flagged as an error while
 <pre>rel1-rel2-rel2+rel1+ext1
-(rel1-rel2)+ext1-(rel2-rel1)</pre> would work.<p>The command line switch 
-that instructs RELASMB to treat all undefined labels as external labels isn't 
-implemented.</p>
+(rel1-rel2)+ext1-(rel2-rel1)</pre> would work.</p>
+<p>The command line switch that instructs RELASMB to treat all undefined labels
+as external labels can be simulated by passing <b>-oUEX</b>.</p>
 
 <h4>Fix Mode</h4>
 
