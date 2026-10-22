@@ -343,6 +343,10 @@
                     see
                          https://github.com/Arakula/A09/issues/20
                     for details.
+   v1.67 2026-10-22 Better handling of 6309 bit-direct instructions
+                    (AIM,EIM,OIM,TIM); see
+                         https://github.com/Arakula/A09/issues/17
+                    for details.
 */
 
 /* @see https://stackoverflow.com/questions/2989810/which-cross-platform-preprocessor-defines-win32-or-win32-or-win32
@@ -373,8 +377,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.66"
-#define VERSNUM      "$0142"            /* can be queried as &VERSION        */
+#define VERSION      "1.67"
+#define VERSNUM      "$0143"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -5937,6 +5941,12 @@ switch (mode)
   case ADRMODE_POST:
   case ADRMODE_IDX:
     putbyte((unsigned char)(co + 0x60));
+    break;
+  case ADRMODE_IND:
+    if (dwOptions & OPTION_H01)
+      error |= ERR_ILLEGAL_ADDR;
+    else
+      putbyte((unsigned char)(co + 0x60));
     break;
   default :
     error |= ERR_ILLEGAL_ADDR;
