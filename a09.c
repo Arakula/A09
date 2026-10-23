@@ -53,6 +53,8 @@
     fcw
     fdb
     fcc
+    fcn
+    fcs
     rmb
     reg
     end
@@ -347,6 +349,7 @@
                     (AIM,EIM,OIM,TIM); see
                          https://github.com/Arakula/A09/issues/17
                     for details.
+   v1.68 2026-10-23 Added FCN / FCS directives
 */
 
 /* @see https://stackoverflow.com/questions/2989810/which-cross-platform-preprocessor-defines-win32-or-win32-or-win32
@@ -377,8 +380,8 @@
 /* Definitions                                                               */
 /*****************************************************************************/
 
-#define VERSION      "1.67"
-#define VERSNUM      "$0143"            /* can be queried as &VERSION        */
+#define VERSION      "1.68"
+#define VERSNUM      "$0144"            /* can be queried as &VERSION        */
 #define RMBDEFCHR    "$00"
 
 #define MAXFILES     128
@@ -528,6 +531,8 @@ struct oprecord
 #define PSEUDO_FILL          48
 #define PSEUDO_PEMT          49
 #define PSEUDO_WRN           50
+#define PSEUDO_FCN           51
+#define PSEUDO_FCS           52
 
 struct oprecord optable09[]=
   {
@@ -719,8 +724,10 @@ struct oprecord optable09[]=
   { "EXTERN",  OPCAT_PSEUDO,      PSEUDO_EXT },
   { "FCB",     OPCAT_PSEUDO,      PSEUDO_FCB },
   { "FCC",     OPCAT_PSEUDO,      PSEUDO_FCC },
+  { "FCN",     OPCAT_PSEUDO,      PSEUDO_FCN },
   { "FCQ",     OPCAT_6309 |
                OPCAT_PSEUDO,      PSEUDO_FCQ },
+  { "FCS",     OPCAT_PSEUDO,      PSEUDO_FCS },
   { "FCW",     OPCAT_PSEUDO,      PSEUDO_FCW },
   { "FDB",     OPCAT_PSEUDO,      PSEUDO_FCW },
   { "FILL",    OPCAT_PSEUDO,      PSEUDO_FILL },
@@ -1091,6 +1098,8 @@ struct oprecord optable00[]=
   { "EXTERN",  OPCAT_PSEUDO,      PSEUDO_EXT },
   { "FCB",     OPCAT_PSEUDO,      PSEUDO_FCB },
   { "FCC",     OPCAT_PSEUDO,      PSEUDO_FCC },
+  { "FCN",     OPCAT_PSEUDO,      PSEUDO_FCN },
+  { "FCS",     OPCAT_PSEUDO,      PSEUDO_FCS },
   { "FCW",     OPCAT_PSEUDO,      PSEUDO_FCW },
   { "FDB",     OPCAT_PSEUDO,      PSEUDO_FCW },
   { "FILL",    OPCAT_PSEUDO,      PSEUDO_FILL },
@@ -1308,6 +1317,8 @@ struct oprecord optable01[]=
   { "EXTERN",  OPCAT_PSEUDO,      PSEUDO_EXT },
   { "FCB",     OPCAT_PSEUDO,      PSEUDO_FCB },
   { "FCC",     OPCAT_PSEUDO,      PSEUDO_FCC },
+  { "FCN",     OPCAT_PSEUDO,      PSEUDO_FCN },
+  { "FCS",     OPCAT_PSEUDO,      PSEUDO_FCS },
   { "FCW",     OPCAT_PSEUDO,      PSEUDO_FCW },
   { "FDB",     OPCAT_PSEUDO,      PSEUDO_FCW },
   { "FILL",    OPCAT_PSEUDO,      PSEUDO_FILL },
@@ -1548,6 +1559,8 @@ struct oprecord optable11[]=
   { "EXTERN",  OPCAT_PSEUDO,      PSEUDO_EXT },
   { "FCB",     OPCAT_PSEUDO,      PSEUDO_FCB },
   { "FCC",     OPCAT_PSEUDO,      PSEUDO_FCC },
+  { "FCN",     OPCAT_PSEUDO,      PSEUDO_FCN },
+  { "FCS",     OPCAT_PSEUDO,      PSEUDO_FCS },
   { "FCW",     OPCAT_PSEUDO,      PSEUDO_FCW },
   { "FDB",     OPCAT_PSEUDO,      PSEUDO_FCW },
   { "FDIV",    OPCAT_ONEBYTE,     0x03 },
@@ -4924,11 +4937,11 @@ if (dwOptions & OPTION_LPA)             /* if in patch mode                  */
       case PSEUDO_FILL :
       case PSEUDO_FCB :
       case PSEUDO_FCC :
+      case PSEUDO_FCN :
+      case PSEUDO_FCS :
         putlist("data %04X", oldlc);
         if (codeptr > 1)
           putlist("-%04X", oldlc + codeptr - 1);
-        /* we got a little conceptual problem here... if RZB or FILL reserve
-        more than sizeof(codebuf) bytes, this is not correctly reflected. */
         putlist("\n");
         break;
       case PSEUDO_FCW :
@@ -6787,6 +6800,8 @@ switch (co)
       } while (*srcptr == ',');
     break; 
   case PSEUDO_FCC :                     /* [label] FCC expr[,expr...]        */
+  case PSEUDO_FCN :                     /* [label] FCN expr[,expr...]        */
+  case PSEUDO_FCS :                     /* [label] FCS expr[,expr...]        */
     setlabel(lp);
     if (!inMacro)
       generating = 1;
@@ -6796,7 +6811,14 @@ switch (co)
       {                                 /* accept ONE sequence with an       */
       c = *srcptr++;                    /* arbitrary delimiter character     */
       while (*srcptr != c && *srcptr)
-        putbyte(*srcptr++);
+        {
+        unsigned char s = (unsigned char)*srcptr++;
+        if (co == PSEUDO_FCS && (!*srcptr || *srcptr == c))
+          s |= 0x80;
+        putbyte(s);
+        if (co == PSEUDO_FCN && (!*srcptr || *srcptr == c))
+          putbyte(0);
+        }
       if (*srcptr == c)
         srcptr++;
       }
@@ -6821,7 +6843,14 @@ switch (co)
           {
           srcptr++;
           while (*srcptr != c && *srcptr)
-            putbyte(*srcptr++);
+            {
+            unsigned char s = (unsigned char)*srcptr++;
+            if (co == PSEUDO_FCS && (!*srcptr || *srcptr == c))
+              s |= 0x80;
+            putbyte(s);
+            if (co == PSEUDO_FCN && (!*srcptr || *srcptr == c))
+              putbyte(0);
+            }
           if (*srcptr == c)
             srcptr++;
           }

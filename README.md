@@ -365,6 +365,14 @@ of these programs). Apart from these, it knows the following directives:
     RELASMB documentation)</td>
   </tr>
   <tr>
+    <td valign="top"><b>FCN <i>text</i></b></td>
+    <td valign="top">works like the <b>FCC</b> directive, but automatically appends a zero byte to strings</td>
+  </tr>
+  <tr>
+    <td valign="top"><b>FCS <i>text</i></b></td>
+    <td valign="top">works like the <b>FCC</b> directive, but automatically sets the sign bit ($80) in the last character of strings</td>
+  </tr>
+  <tr>
     <td valign="top"><b>FILL <i>value</i>,<i>bytecount</i></b></td>
 	<td valign="top">writes the 8-bit value <b><i>value</i></b> into <b><i>bytecount</i></b> consecutive memory locations  
 
